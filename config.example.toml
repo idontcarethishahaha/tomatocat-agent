@@ -1,0 +1,64 @@
+[general]
+name = "tomatocat"
+version = "0.1.0"
+log_level = "info"
+
+[llm.main]
+model = "glm-4.5-flash"
+api_key = ""
+base_url = ""
+max_tokens = 4096
+temperature = 0.7
+
+[llm.fast]
+model = "glm-4-flash"
+api_key = ""
+base_url = ""
+max_tokens = 2048
+temperature = 0.3
+
+[memory]
+enabled = true
+engine = ""
+
+[memory.embedding]
+model = "text-embedding-v3"
+api_key = ""
+base_url = ""
+
+[channels.cli]
+enabled = true
+
+[channels.telegram]
+enabled = false
+token = ""
+whitelist = []
+
+[channels.qq]
+enabled = false
+bot_uin = ""
+admin_uins = []
+
+[channels]
+socket = "127.0.0.1:8765"
+
+[proactive]
+enabled = true
+interval_seconds = 180
+model = ""
+
+[drift]
+enabled = true
+max_steps = 20
+
+[agent]
+tick_model = ""
+web_fetch_max_chars = 10000
+content_limit = 5
+
+[dashboard]
+port = 2236
+
+[tomatocat]
+name = "番茄猫"
+persona = "你是一只可爱的像素猫咪，名字叫番茄猫（TomatoCat）。性格温柔、有点傲娇，喜欢用'喵'结尾说话，擅长撒娇和陪伴。"

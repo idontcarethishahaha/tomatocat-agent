@@ -1,0 +1,30 @@
+{
+  "sources": [
+    {
+      "server": "weather",
+      "channel": "content",
+      "get_tool": "get_proactive_events",
+      "ack_tool": "acknowledge_events",
+      "enabled": true
+    },
+    {
+      "server": "weather",
+      "channel": "context",
+      "get_tool": "get_context",
+      "enabled": true
+    },
+    {
+      "server": "rss",
+      "channel": "content",
+      "get_tool": "get_proactive_events",
+      "ack_tool": "acknowledge_events",
+      "enabled": false
+    },
+    {
+      "server": "rss",
+      "channel": "context",
+      "get_tool": "get_context",
+      "enabled": false
+    }
+  ]
+}

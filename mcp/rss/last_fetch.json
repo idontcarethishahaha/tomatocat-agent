@@ -1,0 +1,280 @@
+{
+  "timestamp": 1782561596.7307737,
+  "articles": [
+    {
+      "title": "是微服务架构不香还是云不香？",
+      "link": "https://coolshell.cn/articles/22422.html",
+      "description": "<p>这两天技术圈里热议的一件事就是Amazon的流媒体平台Prime Video在2023年3月22日发布了一篇技术博客《规模化Prime Video的音视频监控服...</p>\n<p class=\"read-more\"><a class=\"btn btn-default\" href=\"https://coolshell.cn/articles/22422.html\"> Read More<span class=\"screen-reader-text\">  Read More</span></a></p>\nThe post <a href=\"https://coolshell.cn/arti",
+      "published": "Mon, 08 May 2023",
+      "category": "业界新闻",
+      "source": "酷壳",
+      "source_categories": [
+        "技术"
+      ]
+    },
+    {
+      "title": "我看ChatGPT: 为啥谷歌掉了千亿美金",
+      "link": "https://coolshell.cn/articles/22398.html",
+      "description": "<p>两个月前，我试着想用 ChatGPT 帮我写篇文章《eBPF 介绍》，结果错误百出，导致我又要从头改一遍，从那天我觉得 ChatGPT 生成的内容完全不靠谱，所...</p>\n<p class=\"read-more\"><a class=\"btn btn-default\" href=\"https://coolshell.cn/articles/22398.html\"> Read More<span class=\"screen-reader-text\">  Read More</span></a></p>\nThe post <a href=\"https://coolshell.cn/arti",
+      "published": "Sat, 11 Feb 2023",
+      "category": "业界新闻",
+      "source": "酷壳",
+      "source_categories": [
+        "技术"
+      ]
+    },
+    {
+      "title": "聊聊 nostr 和 审查",
+      "link": "https://coolshell.cn/articles/22367.html",
+      "description": "<p>这两天在网络上又有一个东西火了，Twitter 的创始人 @jack 新的社交 iOS App  Damus 上苹果商店（第二天就因为违反中国法律在中国区下架了...</p>\n<p class=\"read-more\"><a class=\"btn btn-default\" href=\"https://coolshell.cn/articles/22367.html\"> Read More<span class=\"screen-reader-text\">  Read More</span></a></p>\nThe post <a href=\"https://coolshell.cn/arti",
+      "published": "Fri, 03 Feb 2023",
+      "category": "业界新闻",
+      "source": "酷壳",
+      "source_categories": [
+        "技术"
+      ]
+    },
+    {
+      "title": "感染新冠的经历",
+      "link": "https://coolshell.cn/articles/22341.html",
+      "description": "<p>写一篇与技术无关的文章，供大家参考。我住北京朝阳，从上周三开始我家一家三口陆续发烧生病，自测抗原后，都是阳性。好消息是，这个奥密克戎跟一般的病毒性感冒差不多，没...</p>\n<p class=\"read-more\"><a class=\"btn btn-default\" href=\"https://coolshell.cn/articles/22341.html\"> Read More<span class=\"screen-reader-text\">  Read More</span></a></p>\nThe post <a href=\"https://coolshell.cn/arti",
+      "published": "Tue, 13 Dec 2022",
+      "category": "杂项资源",
+      "source": "酷壳",
+      "source_categories": [
+        "技术"
+      ]
+    },
+    {
+      "title": "eBPF 介绍",
+      "link": "https://coolshell.cn/articles/22320.html",
+      "description": "<p>很早前就想写一篇关于eBPF的文章，但是迟迟没有动手，这两天有点时间，所以就来写一篇，这文章主要还是简单的介绍eBPF 是用来干什么的，并通过几个示例来介绍是怎...</p>\n<p class=\"read-more\"><a class=\"btn btn-default\" href=\"https://coolshell.cn/articles/22320.html\"> Read More<span class=\"screen-reader-text\">  Read More</span></a></p>\nThe post <a href=\"https://coolshell.cn/arti",
+      "published": "Sat, 10 Dec 2022",
+      "category": "C/C++语言",
+      "source": "酷壳",
+      "source_categories": [
+        "技术"
+      ]
+    },
+    {
+      "title": "聊聊团队协同和协同工具",
+      "link": "https://coolshell.cn/articles/22298.html",
+      "description": "<p>这两天跟 Cali 和 Rather 做了一个线上的 Podcast &#8211; Ep.5 一起聊聊团队协同。主要是从 IM 工具扩展开来聊了一下团队的协同...</p>\n<p class=\"read-more\"><a class=\"btn btn-default\" href=\"https://coolshell.cn/articles/22298.html\"> Read More<span class=\"screen-reader-text\">  Read More</span></a></p>\nThe post <a href=\"https://coolshell.cn/arti",
+      "published": "Fri, 14 Oct 2022",
+      "category": "杂项资源",
+      "source": "酷壳",
+      "source_categories": [
+        "技术"
+      ]
+    },
+    {
+      "title": "从一次经历谈 TIME_WAIT 的那些事",
+      "link": "https://coolshell.cn/articles/22263.html",
+      "description": "<p>今天来讲一讲TCP 的 TIME_WAIT 的问题。这个问题尽人皆知，不过，这次遇到的是不太一样的场景，前两天也解决了，正好写篇文章，顺便把 TIME_WAIT...</p>\n<p class=\"read-more\"><a class=\"btn btn-default\" href=\"https://coolshell.cn/articles/22263.html\"> Read More<span class=\"screen-reader-text\">  Read More</span></a></p>\nThe post <a href=\"https://coolshell.cn/arti",
+      "published": "Tue, 19 Jul 2022",
+      "category": "Go 语言",
+      "source": "酷壳",
+      "source_categories": [
+        "技术"
+      ]
+    },
+    {
+      "title": "ETCD的内存问题",
+      "link": "https://coolshell.cn/articles/22242.html",
+      "description": "<p>今天跟大家分享一个etcd的内存大量占用的问题，这是前段时间在我们开源软件Easegress中遇到的问题，问题是比较简单的，但是我还想把前因后果说一下，包括，为...</p>\n<p class=\"read-more\"><a class=\"btn btn-default\" href=\"https://coolshell.cn/articles/22242.html\"> Read More<span class=\"screen-reader-text\">  Read More</span></a></p>\nThe post <a href=\"https://coolshell.cn/arti",
+      "published": "Thu, 05 May 2022",
+      "category": "Go 语言",
+      "source": "酷壳",
+      "source_categories": [
+        "技术"
+      ]
+    },
+    {
+      "title": "“一把梭：REST API 全用 POST”",
+      "link": "https://coolshell.cn/articles/22173.html",
+      "description": "<p>写这篇文章的原因主要还是因为V2EX上的这个贴子，这个贴子中说—— “对接同事的接口，他定义的所有接口都是 post 请求，理由是 https 用 post 更...</p>\n<p class=\"read-more\"><a class=\"btn btn-default\" href=\"https://coolshell.cn/articles/22173.html\"> Read More<span class=\"screen-reader-text\">  Read More</span></a></p>\nThe post <a href=\"https://coolshell.cn/arti",
+      "published": "Sun, 13 Feb 2022",
+      "category": "技术新闻",
+      "source": "酷壳",
+      "source_categories": [
+        "技术"
+      ]
+    },
+    {
+      "title": "谈谈公司对员工的监控",
+      "link": "https://coolshell.cn/articles/22157.html",
+      "description": "<p>今天看到微博上有一个热点事件， 是一个关于某公司做的一个监控员工离职倾向的软件，从截图中可以看到员工访问招聘网站的次数，还有投递的简历以及搜索的关建词等等信息，...</p>\n<p class=\"read-more\"><a class=\"btn btn-default\" href=\"https://coolshell.cn/articles/22157.html\"> Read More<span class=\"screen-reader-text\">  Read More</span></a></p>\nThe post <a href=\"https://coolshell.cn/arti",
+      "published": "Sat, 12 Feb 2022",
+      "category": "技术新闻",
+      "source": "酷壳",
+      "source_categories": [
+        "技术"
+      ]
+    },
+    {
+      "title": "网络数字身份认证术",
+      "link": "https://coolshell.cn/articles/21708.html",
+      "description": "<p>这篇文章是《HTTP API 认证授权术》的姊妹篇，在那篇文章中，主要介绍了 HTTP API 认证和授权技术中用到的 HTTP Basic, Digest A...</p>\n<p class=\"read-more\"><a class=\"btn btn-default\" href=\"https://coolshell.cn/articles/21708.html\"> Read More<span class=\"screen-reader-text\">  Read More</span></a></p>\nThe post <a href=\"https://coolshell.cn/arti",
+      "published": "Sun, 02 Jan 2022",
+      "category": "程序设计",
+      "source": "酷壳",
+      "source_categories": [
+        "技术"
+      ]
+    },
+    {
+      "title": "我做系统架构的一些原则",
+      "link": "https://coolshell.cn/articles/21672.html",
+      "description": "<p>工作 20 多年了，这 20 来年看到了很多公司系统架构，也看到了很多问题，在跟这些公司进行交流和讨论的时候，包括进行实施和方案比较的时候，都有很多各种方案的比...</p>\n<p class=\"read-more\"><a class=\"btn btn-default\" href=\"https://coolshell.cn/articles/21672.html\"> Read More<span class=\"screen-reader-text\">  Read More</span></a></p>\nThe post <a href=\"https://coolshell.cn/arti",
+      "published": "Tue, 21 Dec 2021",
+      "category": "程序设计",
+      "source": "酷壳",
+      "source_categories": [
+        "技术"
+      ]
+    },
+    {
+      "title": "源代码特洛伊木马攻击",
+      "link": "https://coolshell.cn/articles/21649.html",
+      "description": "<p>最近，我们在 Github 的 Code Review 中看到 Github 开始出现下面这个 Warning 信息—— “This file contains...</p>\n<p class=\"read-more\"><a class=\"btn btn-default\" href=\"https://coolshell.cn/articles/21649.html\"> Read More<span class=\"screen-reader-text\">  Read More</span></a></p>\nThe post <a href=\"https://coolshell.cn/arti",
+      "published": "Fri, 19 Nov 2021",
+      "category": "网络安全",
+      "source": "酷壳",
+      "source_categories": [
+        "技术"
+      ]
+    },
+    {
+      "title": "Go编程模式 ： 泛型编程",
+      "link": "https://coolshell.cn/articles/21615.html",
+      "description": "<p>Go语言的1.17版本发布了，其中开始正式支持泛型了。虽然还有一些限制（比如，不能把泛型函数export），但是，可以体验了。我的这个《Go编程模式》的系列终于...</p>\n<p class=\"read-more\"><a class=\"btn btn-default\" href=\"https://coolshell.cn/articles/21615.html\"> Read More<span class=\"screen-reader-text\">  Read More</span></a></p>\nThe post <a href=\"https://coolshell.cn/arti",
+      "published": "Sat, 04 Sep 2021",
+      "category": "Go 语言",
+      "source": "酷壳",
+      "source_categories": [
+        "技术"
+      ]
+    },
+    {
+      "title": "如何做一个有质量的技术分享",
+      "link": "https://coolshell.cn/articles/21589.html",
+      "description": "<p>分享信息并不难，大多数人都能做到，就算是不善言谈性格内向的技术人员，通过博客或社交媒体，或是不正式的交流，他们都能或多或少的做到。但是如果你想要做一个有质量有高...</p>\n<p class=\"read-more\"><a class=\"btn btn-default\" href=\"https://coolshell.cn/articles/21589.html\"> Read More<span class=\"screen-reader-text\">  Read More</span></a></p>\nThe post <a href=\"https://coolshell.cn/arti",
+      "published": "Tue, 13 Jul 2021",
+      "category": "技术读物",
+      "source": "酷壳",
+      "source_categories": [
+        "技术"
+      ]
+    },
+    {
+      "title": "本周看什么 | 最近值得一看的 10 部作品",
+      "link": "https://sspai.com/post/111562",
+      "description": "📅本周新预告《克拉拉与太阳》首支预告6月23日，电影《克拉拉与太阳》发布了首支预告，将于10月23日在北美上映。塔伊加·维迪提执导，詹娜·奥尔特加、艾米·亚当斯主演，改编自石黑一雄的同名小说，人工智能 ...<a href=\"https://sspai.com/post/111562\" target=\"_blank\">查看全文</a>",
+      "published": "Fri, 26 Jun 2026",
+      "category": "",
+      "source": "少数派",
+      "source_categories": [
+        "科技"
+      ]
+    },
+    {
+      "title": "探索快捷指令的上限：用网页视图创建丰富界面与交互",
+      "link": "https://sspai.com/prime/story/create-webview-in-shortcuts",
+      "description": "从锁屏按钮、锁屏小组件、负一屏小组件，到桌面小组件、控制中心、Siri、自动化触发……iPhone的快捷指令有着超级多的打开方式，我们也可以为自己写的或从网络上获取的实用快捷指令设置一种最顺手的。与之 ...<a href=\"https://sspai.com/prime/story/create-webview-in-shortcuts\" target=\"_blank\">查看全文</a><p>本文为会员文章，出自<a href=\"https://sspai.com/prime/precog/single\" target=\"_blank\">《单篇文章》</a >，订阅后可阅读全文。</p >",
+      "published": "Fri, 26 Jun 2026",
+      "category": "",
+      "source": "少数派",
+      "source_categories": [
+        "科技"
+      ]
+    },
+    {
+      "title": "空调续命之外的清凉：这是我们的夏日降温「新」方案",
+      "link": "https://sspai.com/post/100319",
+      "description": "当夏天的热浪席卷城市，北方在烈日下承受着如烤箱般的双面炙烤，南方在骄阳下忍受着如蒸笼般的闷湿高温，能够每天陪伴我们的「降温好物」成为必需。又是一年盛夏时，我们邀请了6位少数派作者，聊聊那些真正融入日常 ...<a href=\"https://sspai.com/post/100319\" target=\"_blank\">查看全文</a>",
+      "published": "Fri, 26 Jun 2026",
+      "category": "",
+      "source": "少数派",
+      "source_categories": [
+        "科技"
+      ]
+    },
+    {
+      "title": "林檎越东瀛：苹果的日本之旅",
+      "link": "https://sspai.com/post/111297",
+      "description": "当年「林檎渡东瀛」的试探，终演变成一场与亚洲产业命运相依的交响。<a href=\"https://sspai.com/post/111297\" target=\"_blank\">查看全文</a>",
+      "published": "Fri, 26 Jun 2026",
+      "category": "",
+      "source": "少数派",
+      "source_categories": [
+        "科技"
+      ]
+    },
+    {
+      "title": "派早报：鸿蒙智行发布尊界 S800 Grand Design 典藏大观",
+      "link": "https://sspai.com/post/111541",
+      "description": "Apple 调整产品价格，Figma 发布多项更新等。<a href=\"https://sspai.com/post/111541\" target=\"_blank\">查看全文</a>",
+      "published": "Fri, 26 Jun 2026",
+      "category": "",
+      "source": "少数派",
+      "source_categories": [
+        "科技"
+      ]
+    },
+    {
+      "title": "新玩意 245｜少数派的编辑们最近买了啥？",
+      "link": "https://sspai.com/post/111518",
+      "description": "关于栏目很多读者都会好奇少数派的编辑们到底平时都「买了啥」。我们希望通过「编辑部的新玩意」介绍编辑部成员们最近在用的新奇产品，让他们自己来谈谈这些新玩意的使用体验究竟如何。@克莱德：GoogleSta ...<a href=\"https://sspai.com/post/111518\" target=\"_blank\">查看全文</a>",
+      "published": "Thu, 25 Jun 2026",
+      "category": "",
+      "source": "少数派",
+      "source_categories": [
+        "科技"
+      ]
+    },
+    {
+      "title": "给记忆一个归处：我为什么开始使用 Apple 手记",
+      "link": "https://sspai.com/post/111421",
+      "description": "《手记》是Apple在iOS17.2中推出的原生日记应用，它可以帮助用户更轻松地记录生活、保存回忆、培养反思与感恩等习惯。今年以来，我频繁地使用手记这款应用。不过，我开始使用它的契机并不是为了写日记， ...<a href=\"https://sspai.com/post/111421\" target=\"_blank\">查看全文</a>",
+      "published": "Thu, 25 Jun 2026",
+      "category": "",
+      "source": "少数派",
+      "source_categories": [
+        "科技"
+      ]
+    },
+    {
+      "title": "把心情贴在手机背面：XTREM INNO 极稚墨水屏手机壳体验",
+      "link": "https://sspai.com/post/111483",
+      "description": "手机主屏幕的个性化，如今越发受到重视。遍观各大手机操作系统的更新，几乎都会提到主屏幕装扮方式的增加——从壁纸、时钟再到图标、挂件，几乎没有哪个角落是不能按自己喜好调整的。对比之下，手机背面反而成为了「 ...<a href=\"https://sspai.com/post/111483\" target=\"_blank\">查看全文</a>",
+      "published": "Thu, 25 Jun 2026",
+      "category": "",
+      "source": "少数派",
+      "source_categories": [
+        "科技"
+      ]
+    },
+    {
+      "title": "风暖鸟声碎，日高花影重：我的昆明与腾冲行记",
+      "link": "https://sspai.com/post/111349",
+      "description": "云南气候实在是太好了，昆明海拔将近两千，每次出门都有一种凉爽感包裹全身。而腾冲太适合旅居了，既有中高端的酒店可供享受奢靡之风，也有历史文化供我们反思来时的路，更好的去面对未来，还有拿上衣服就可以随地大小泡的温泉，美哉！<a href=\"https://sspai.com/post/111349\" target=\"_blank\">查看全文</a>",
+      "published": "Thu, 25 Jun 2026",
+      "category": "",
+      "source": "少数派",
+      "source_categories": [
+        "科技"
+      ]
+    },
+    {
+      "title": "派早报：豆包推出专业版、GTA VI 开启预售等",
+      "link": "https://sspai.com/post/111476",
+      "description": "OpenAI 发布 AI 推理芯片 Jalapeño、Goodram 推出 SD 存储卡 PRO S6B0 等。<a href=\"https://sspai.com/post/111476\" target=\"_blank\">查看全文</a>",
+      "published": "Thu, 25 Jun 2026",
+      "category": "",
+      "source": "少数派",
+      "source_categories": [
+        "科技"
+      ]
+    }
+  ]
+}
