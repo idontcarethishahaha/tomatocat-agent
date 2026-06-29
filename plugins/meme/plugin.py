@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import re
 from pathlib import Path
 from typing import Any, cast
@@ -8,6 +9,8 @@ from agent.lifecycle.types import AfterReasoningCtx, PromptRenderCtx
 from agent.plugins import Plugin, on_after_reasoning
 from agent.prompting import PromptSectionRender
 from .runtime import MemeCatalog, MemeDecorator
+
+logger = logging.getLogger(__name__)
 
 _CTX_SLOT = "prompt:ctx"
 _MEME_RE = re.compile(r"<meme:([a-zA-Z0-9_-]+)>", re.IGNORECASE)
@@ -54,8 +57,11 @@ class MemePlugin(Plugin):
 
     @on_after_reasoning()
     async def decorate_meme(self, ctx: AfterReasoningCtx) -> AfterReasoningCtx:
+        logger.info(f"[meme] decorate_meme called for channel={ctx.channel} reply={ctx.reply[:50]!r}")
         cleaned, tag = _extract_meme_tag(ctx.reply)
+        logger.info(f"[meme] after _extract_meme_tag: cleaned={cleaned[:50]!r} tag={tag}")
         decorated = self.decorator.decorate(cleaned, meme_tag=tag)
+        logger.info(f"[meme] after decorator.decorate: media={decorated.media}")
         ctx.reply = decorated.content
         ctx.media.extend(decorated.media)
         ctx.meme_tag = decorated.tag
