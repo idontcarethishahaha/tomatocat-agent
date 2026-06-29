@@ -21,7 +21,7 @@ class SchedulerToolsetProvider(ToolsetProvider):
         if scheduler is None:
             raise RuntimeError("SchedulerToolsetProvider requires scheduler")
         registry.register(
-            ScheduleTool(scheduler),
+            ScheduleTool(scheduler, default_tz="Asia/Shanghai"),
             risk="write",
             search_hint="cron timer 延时执行",
         )
