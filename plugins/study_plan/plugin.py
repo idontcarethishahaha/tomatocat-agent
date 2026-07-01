@@ -1,9 +1,13 @@
-"""学习计划插件 - 番茄猫学习助手"""
+"""学习计划插件 - 番茄猫学习助手
+
+参考 tomatocat 项目的实现，采用 target/completed/unit 灵活单位设计。
+支持：题、章、页、小时等多种单位；进度百分比计算；连续学习天数追踪。
+"""
 
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from tomatocat.plugins import Plugin, tool
@@ -25,139 +29,86 @@ class StudyPlanPlugin(Plugin):
         self._data_dir.mkdir(exist_ok=True)
         return self._data_dir
 
+    @property
     def _plans_file(self) -> Path:
         return self._ensure_data_dir() / "plans.json"
 
+    @property
     def _logs_file(self) -> Path:
         return self._ensure_data_dir() / "logs.json"
 
-    def _read_plans(self) -> dict:
-        path = self._plans_file()
-        if path.exists():
-            with open(path, "r", encoding="utf-8") as f:
-                return json.load(f)
-        return {"plans": []}
+    # ── 数据读写 ─────────────────────────────────────────────────
 
-    def _write_plans(self, data: dict) -> None:
-        with open(self._plans_file(), "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
+    def _load_plans(self) -> list[dict]:
+        if self._plans_file.exists():
+            try:
+                data = json.loads(self._plans_file.read_text(encoding="utf-8"))
+                # 兼容旧的 {"plans": [...]} 格式和纯数组格式
+                if isinstance(data, dict):
+                    return data.get("plans", [])
+                return data
+            except (json.JSONDecodeError, IOError):
+                return []
+        return []
 
-    def _read_logs(self) -> dict:
-        path = self._logs_file()
-        if path.exists():
-            with open(path, "r", encoding="utf-8") as f:
-                return json.load(f)
-        return {"logs": []}
+    def _save_plans(self, plans: list[dict]) -> None:
+        self._plans_file.write_text(
+            json.dumps(plans, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
 
-    def _write_logs(self, data: dict) -> None:
-        with open(self._logs_file(), "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
+    def _load_logs(self) -> list[dict]:
+        if self._logs_file.exists():
+            try:
+                data = json.loads(self._logs_file.read_text(encoding="utf-8"))
+                if isinstance(data, dict):
+                    return data.get("logs", [])
+                return data
+            except (json.JSONDecodeError, IOError):
+                return []
+        return []
 
-    @tool(name="create_study_plan", description="创建一个学习计划")
-    async def create_study_plan(
-        self,
-        event: object,
-        title: str,
-        subject: str = "",
-        total_hours: float = 0,
-        deadline: str = "",
-    ) -> str:
-        """
-        创建学习计划
+    def _save_logs(self, logs: list[dict]) -> None:
+        self._logs_file.write_text(
+            json.dumps(logs, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
 
-        Args:
-            title: 计划标题
-            subject: 科目/主题
-            total_hours: 预计总时长（小时）
-            deadline: 截止日期（YYYY-MM-DD）
-        """
-        data = self._read_plans()
-        plan = {
-            "id": len(data["plans"]) + 1,
-            "title": title,
-            "subject": subject,
-            "total_hours": total_hours,
-            "completed_hours": 0,
-            "deadline": deadline,
-            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "status": "active",
-        }
-        data["plans"].append(plan)
-        self._write_plans(data)
+    # ── 数据兼容迁移 ─────────────────────────────────────────────
 
-        msg = f"已创建学习计划：{title} (≧∇≦)ﾉ"
-        if subject:
-            msg += f"\n科目：{subject}"
-        if total_hours > 0:
-            msg += f"\n预计时长：{total_hours}小时"
-        if deadline:
-            msg += f"\n截止日期：{deadline}"
-        msg += "\n加油喵！"
-        return msg
+    def _migrate_plan(self, plan: dict) -> dict:
+        """迁移旧数据结构（total_hours/completed_hours → target/completed/unit）"""
+        if "target" not in plan:
+            plan["target"] = float(plan.get("total_hours", 0))
+            plan["completed"] = float(plan.get("completed_hours", 0))
+            plan["unit"] = "小时"
+        if "unit" not in plan:
+            plan["unit"] = "小时"
+        # 确保数值类型正确
+        plan["target"] = float(plan.get("target", 0))
+        plan["completed"] = float(plan.get("completed", 0))
+        return plan
 
-    @tool(name="log_study", description="记录学习打卡")
-    async def log_study(
-        self,
-        event: object,
-        hours: str,
-        subject: str = "",
-        content: str = "",
-        plan_id: int = 0,
-    ) -> str:
-        """
-        记录学习时长
-
-        Args:
-            hours: 学习时长（小时）
-            subject: 学习科目
-            content: 学习内容
-            plan_id: 关联的计划ID
-        """
-        try:
-            hours_val = float(str(hours).replace("小时", "").replace("h", "").strip())
-        except ValueError:
-            return f"喵？时长 '{hours}' 不对哦 (=｀ω´=)"
-
-        now = datetime.now()
-        logs_data = self._read_logs()
-
-        log = {
-            "id": len(logs_data["logs"]) + 1,
-            "date": now.strftime("%Y-%m-%d"),
-            "hours": hours_val,
-            "subject": subject,
-            "content": content,
-            "plan_id": plan_id,
-            "created_at": now.strftime("%Y-%m-%d %H:%M:%S"),
-        }
-        logs_data["logs"].append(log)
-        self._write_logs(logs_data)
-
-        if plan_id > 0:
-            plans_data = self._read_plans()
-            for plan in plans_data["plans"]:
-                if plan["id"] == plan_id:
-                    plan["completed_hours"] += hours_val
-                    self._write_plans(plans_data)
-                    break
-
-        streak = self._get_streak()
-        msg = f"打卡成功！今天学习了 {hours_val} 小时 (≧∇≦)ﾉ\n"
-        msg += f"连续学习：{streak} 天"
-        if streak >= 7:
-            msg += " 太厉害了喵！"
-        return msg
+    def _calc_progress(self, plan: dict) -> tuple[float, str]:
+        """计算进度，返回 (progress_percent, display_str)"""
+        plan = self._migrate_plan(plan)
+        target = float(plan.get("target", 0))
+        completed = float(plan.get("completed", 0))
+        unit = plan.get("unit", "小时")
+        if target <= 0:
+            return 0.0, f"{completed}/{unit}"
+        progress = (completed / target) * 100
+        return progress, f"{completed}/{target} {unit}"
 
     def _get_streak(self) -> int:
-        logs_data = self._read_logs()
-        dates = set()
-        for log in logs_data["logs"]:
-            dates.add(log["date"])
-
+        logs = self._load_logs()
+        if not logs:
+            return 0
+        dates = set(log.get("date", "") for log in logs)
         streak = 0
-        today = datetime.now().date()
+        today = date.today()
         for i in range(365):
-            check_date = (today - timedelta(days=i)).strftime("%Y-%m-%d")
+            check_date = (today - timedelta(days=i)).isoformat()
             if check_date in dates:
                 streak += 1
             else:
@@ -166,42 +117,213 @@ class StudyPlanPlugin(Plugin):
                 break
         return streak
 
-    @tool(name="get_study_progress", description="查看学习进度")
-    async def get_study_progress(
+    # ── 工具 ─────────────────────────────────────────────────────
+
+    @tool(name="create_study_plan", description="创建一个学习计划")
+    async def create_study_plan(
         self,
         event: object,
-        plan_id: int = 0,
+        subject: str,
+        target: float,
+        unit: str = "小时",
+        deadline: str = "",
     ) -> str:
+        """
+        创建学习计划
+
+        Args:
+            subject: 学习主题/科目，如"leetcode 热题HOT100"
+            target: 目标数量，如10
+            unit: 单位，如"题"、"章"、"页"、"小时"，默认"小时"
+            deadline: 截止日期，如"2026-06-30"，可选
+        """
+        plans = self._load_plans()
+
+        # 去重检查：如果已有相同 subject + deadline 的 active 计划，不重复创建
+        for existing in plans:
+            if (
+                existing.get("subject") == subject
+                and existing.get("deadline", "") == deadline
+                and existing.get("status", "active") == "active"
+            ):
+                return f"已存在相同的学习计划: {subject}（ID:{existing['id']}），不重复创建哦 (=^･ω･^)"
+
+        target_val = float(target)
+        plan = {
+            "id": len(plans) + 1,
+            "subject": subject,
+            "target": target_val,
+            "completed": 0.0,
+            "unit": unit,
+            "deadline": deadline,
+            "created_at": datetime.now().isoformat(),
+            "status": "active",
+        }
+        plans.append(plan)
+        self._save_plans(plans)
+
+        msg = f"已创建学习计划: {subject}，目标: {target_val}{unit} (=^･ω･^=)"
+        if deadline:
+            msg += f"\n截止日期: {deadline}"
+        return msg
+
+    @tool(name="log_study", description="记录学习打卡")
+    async def log_study(
+        self,
+        event: object,
+        plan_id: int,
+        count: float = 0,
+        hours: float = 0,
+    ) -> str:
+        """
+        记录学习打卡
+
+        Args:
+            plan_id: 计划ID
+            count: 完成的数量（如3道题），优先使用
+            hours: 学习小时数，count为0时使用hours
+        """
+        plans = self._load_plans()
+        logs = self._load_logs()
+
+        for plan in plans:
+            if plan["id"] == plan_id:
+                plan = self._migrate_plan(plan)
+
+                # 优先用 count，其次用 hours
+                amount = float(count) if count and count > 0 else float(hours)
+                if amount <= 0:
+                    return "请输入有效的学习数量 (=｀ω´=)"
+
+                plan["completed"] = float(plan.get("completed", 0)) + amount
+                self._save_plans(plans)
+
+                log = {
+                    "plan_id": plan_id,
+                    "count": count if (count and count > 0) else 0,
+                    "hours": hours,
+                    "amount": amount,
+                    "unit": plan.get("unit", "小时"),
+                    "date": date.today().isoformat(),
+                    "timestamp": datetime.now().isoformat(),
+                }
+                logs.append(log)
+                self._save_logs(logs)
+
+                progress, display = self._calc_progress(plan)
+                status = "✅" if progress >= 100 else "⏳"
+                streak = self._get_streak()
+                msg = f"已记录: {plan['subject']} +{amount}{plan['unit']}，{status} {display} (≧∇≦)ﾉ"
+                if streak > 0:
+                    msg += f"\n连续学习: {streak}天"
+                return msg
+
+        return f"未找到计划 ID: {plan_id} (=｀ω´=)"
+
+    @tool(name="get_study_progress", description="查看学习进度")
+    async def get_study_progress(self, event: object, plan_id: int = 0) -> str:
         """
         查看学习进度
 
         Args:
-            plan_id: 计划ID（0表示所有计划）
+            plan_id: 计划ID，不填则查看全部
         """
-        plans_data = self._read_plans()
+        plans = self._load_plans()
 
         if plan_id > 0:
-            for plan in plans_data["plans"]:
-                if plan["id"] == plan_id:
-                    progress = 0
-                    if plan["total_hours"] > 0:
-                        progress = (plan["completed_hours"] / plan["total_hours"]) * 100
-                    msg = f"📚 {plan['title']}\n"
-                    msg += f"进度：{plan['completed_hours']:.1f}/{plan['total_hours']:.1f}小时 ({progress:.1f}%)"
-                    return msg
-            return "没有找到这个学习计划哦 (・_・;)"
-        else:
-            active_plans = [p for p in plans_data["plans"] if p["status"] == "active"]
-            if not active_plans:
-                return "还没有学习计划哦，创建一个吧 (｡•ᴗ-｡)♡"
+            plan = next((p for p in plans if p["id"] == plan_id), None)
+            if not plan:
+                return f"未找到计划 ID: {plan_id} (=｀ω´=)"
+            plan = self._migrate_plan(plan)
+            progress, display = self._calc_progress(plan)
+            status = "✅" if progress >= 100 else "⏳"
+            return f"{status} {plan['subject']}: {display} ({progress:.1f}%) (=^･ω･^=)"
 
-            msg = "📚 学习计划列表：\n"
-            for plan in active_plans[:5]:
-                progress = 0
-                if plan["total_hours"] > 0:
-                    progress = (plan["completed_hours"] / plan["total_hours"]) * 100
-                msg += f"\n{plan['id']}. {plan['title']} - {progress:.1f}%"
-            return msg
+        # 过滤 active 计划
+        active_plans = [p for p in plans if p.get("status", "active") == "active"]
+        if not active_plans:
+            return "暂无学习计划，创建一个吧 (｡•ᴗ-｡)♡"
+
+        today = date.today().isoformat()
+        result_lines = [f"📊 今日进度 ({today})", ""]
+
+        completed_items = []
+        in_progress_items = []
+
+        for plan in active_plans:
+            plan = self._migrate_plan(plan)
+            target = float(plan.get("target", 0))
+            completed = float(plan.get("completed", 0))
+            unit = plan.get("unit", "小时")
+
+            progress, _ = self._calc_progress(plan)
+            item = f"{plan['subject']}: {completed}/{target} {unit}"
+
+            if progress >= 100:
+                completed_items.append(item)
+            else:
+                in_progress_items.append(item)
+
+        for item in completed_items:
+            result_lines.append(f"✅ {item}")
+        for item in in_progress_items:
+            result_lines.append(f"⏳ {item}")
+
+        if not completed_items and not in_progress_items:
+            result_lines.append("  暂无记录 (=^･ω･^)")
+        else:
+            result_lines.append("")
+            result_lines.append(
+                f"🕐 累计：完成 {len(completed_items)} 项，进行中 {len(in_progress_items)} 项"
+            )
+
+        return "\n".join(result_lines)
+
+    @tool(name="get_daily_summary", description="获取每日学习汇总")
+    async def get_daily_summary(self, event: object, date_str: str = "") -> str:
+        """
+        获取每日学习汇总
+
+        Args:
+            date_str: 日期，不填则默认今天
+        """
+        logs = self._load_logs()
+        plans = self._load_plans()
+
+        target_date = date_str or date.today().isoformat()
+
+        daily_logs = [l for l in logs if l.get("date") == target_date]
+
+        if not daily_logs:
+            return f"📊 {target_date} 暂无学习记录 (=^･ω･^)"
+
+        plan_map = {p["id"]: p for p in plans}
+        daily_by_plan: dict[int, list[dict]] = {}
+        for log in daily_logs:
+            pid = log.get("plan_id")
+            daily_by_plan.setdefault(pid, []).append(log)
+
+        lines = [f"📊 {target_date} 学习汇总", ""]
+
+        total_amount = 0.0
+        unit_used = "项"
+
+        for pid, plan_logs in daily_by_plan.items():
+            plan = plan_map.get(pid, {"subject": f"计划#{pid}", "unit": "小时"})
+            plan = self._migrate_plan(plan)
+            unit = plan.get("unit", "小时")
+            total = sum(log.get("amount", 0) for log in plan_logs)
+            total_amount += total
+            if unit_used == "项" or unit == unit_used:
+                unit_used = unit
+            else:
+                unit_used = "混合"
+            lines.append(f"  ✅ {plan['subject']}: +{total} {unit}")
+
+        lines.append("")
+        lines.append(f"🕐 累计完成: {total_amount} {unit_used} (≧∇≦)ﾉ")
+
+        return "\n".join(lines)
 
     @tool(name="get_study_streak", description="查看连续学习天数")
     async def get_study_streak(self, event: object) -> str:

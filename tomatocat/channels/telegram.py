@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
 from telegram import Update
+from telegram.error import TimedOut, NetworkError, RetryAfter
 from telegram.ext import (
     ApplicationBuilder,
     ContextTypes,
@@ -17,6 +19,11 @@ from telegram.ext import (
 from .base import Channel
 
 logger = logging.getLogger(__name__)
+
+# 主动消息发送的超时和重试配置
+_SEND_TIMEOUT = 30  # 秒
+_SEND_RETRIES = 2
+_SEND_RETRY_DELAY = 3  # 秒
 
 
 class TelegramChannel(Channel):
@@ -55,17 +62,48 @@ class TelegramChannel(Channel):
             await self._application.shutdown()
 
     async def send_message(self, chat_id: str, text: str) -> None:
+        """发送主动消息，带超时和重试"""
         if not self._application or not chat_id:
             return
-        try:
-            await self._application.bot.send_message(
-                chat_id=chat_id,
-                text=text,
-                disable_web_page_preview=True,
-            )
-            logger.info(f"[telegram] 主动消息已发送至 {chat_id}")
-        except Exception as e:
-            logger.error(f"[telegram] 主动消息发送失败: {e}")
+
+        # 去掉 chat_id 中的 channel 前缀（如 "telegram:8824997206" → "8824997206"）
+        if ":" in str(chat_id):
+            chat_id = str(chat_id).split(":", 1)[1]
+
+        for attempt in range(_SEND_RETRIES + 1):
+            try:
+                await asyncio.wait_for(
+                    self._application.bot.send_message(
+                        chat_id=chat_id,
+                        text=text,
+                        disable_web_page_preview=True,
+                    ),
+                    timeout=_SEND_TIMEOUT,
+                )
+                logger.info(f"[telegram] 主动消息已发送至 {chat_id}")
+                return
+            except TimedOut:
+                logger.warning(
+                    f"[telegram] 主动消息发送超时 (attempt {attempt + 1}/{_SEND_RETRIES + 1}) chat_id={chat_id}"
+                )
+                if attempt < _SEND_RETRIES:
+                    await asyncio.sleep(_SEND_RETRY_DELAY)
+                else:
+                    logger.error(f"[telegram] 主动消息发送失败（超时重试耗尽）: chat_id={chat_id}")
+            except RetryAfter as e:
+                logger.warning(f"[telegram] 触发限流，等待 {e.retry_after}s 后重试")
+                await asyncio.sleep(e.retry_after)
+            except NetworkError as e:
+                logger.warning(
+                    f"[telegram] 网络错误 (attempt {attempt + 1}): {e}"
+                )
+                if attempt < _SEND_RETRIES:
+                    await asyncio.sleep(_SEND_RETRY_DELAY)
+                else:
+                    logger.error(f"[telegram] 主动消息发送失败（网络错误重试耗尽）: {e}")
+            except Exception as e:
+                logger.error(f"[telegram] 主动消息发送失败: {e}")
+                return
 
     async def send_photo(self, chat_id: str, photo_path: str, caption: str = "") -> None:
         if not self._application or not chat_id:

@@ -52,56 +52,24 @@ class MemeService:
         return random.choice(files)
 
     def decorate_reply(self, text: str) -> MemeResult:
+        """从回复文本中提取 [meme:xxx] 标签并替换为媒体文件。
+
+        参考 tomatocat 的做法：只有 AI 显式输出标签时才发表情包，
+        不自动检测情绪，避免每次回复都匹配到媒体。
+        """
         media_paths: list[Path] = []
         cleaned = text
 
-        pattern = r"\[meme[=:]\s*([^\]]+)\]"
-        matches = list(re.finditer(pattern, text))
+        # 支持 [meme:xxx] 和 <meme:xxx> 两种格式
+        pattern = r"[<\[]meme[=:]\s*([^\]>]+)[>\]]"
+        matches = list(re.finditer(pattern, text, re.IGNORECASE))
 
         for match in matches:
             tag = match.group(1).strip()
             meme_path = self.get_meme(tag)
             if meme_path:
                 media_paths.append(meme_path)
-                cleaned = cleaned.replace(match.group(0), "", 1)
-
-        if not media_paths and not matches:
-            emotion_tags = self._detect_emotion(text)
-            for tag in emotion_tags:
-                meme_path = self.get_meme(tag)
-                if meme_path:
-                    media_paths.append(meme_path)
-                    break
+            cleaned = cleaned.replace(match.group(0), "", 1)
 
         cleaned = cleaned.strip()
         return MemeResult(text=cleaned, media_paths=media_paths)
-
-    def _detect_emotion(self, text: str) -> list[str]:
-        emotions = []
-        text_lower = text.lower()
-
-        happy_keywords = ["开心", "高兴", "快乐", "哈哈", "棒", "好耶", "太棒了", "嘻嘻", "^_^", "≧∇≦"]
-        if any(k in text for k in happy_keywords):
-            emotions.append("happy")
-            emotions.append("开心")
-
-        sad_keywords = ["难过", "伤心", "哭", "呜呜", "不开心", "失望", "555", "呜"]
-        if any(k in text for k in sad_keywords):
-            emotions.append("sad")
-            emotions.append("难过")
-
-        shy_keywords = ["害羞", "脸红", "不好意思", "谢谢", "感谢", "〃", "羞"]
-        if any(k in text for k in shy_keywords):
-            emotions.append("shy")
-            emotions.append("害羞")
-
-        angry_keywords = ["生气", "哼", "气死", "讨厌", "可恶"]
-        if any(k in text for k in angry_keywords):
-            emotions.append("angry")
-            emotions.append("生气")
-
-        thinking_keywords = ["思考", "嗯...", "等等", "让我想想"]
-        if any(k in text for k in thinking_keywords):
-            emotions.append("thinking")
-
-        return emotions

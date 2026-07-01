@@ -115,6 +115,17 @@ class PluginManager:
         if tool_info is None:
             return f"错误：未找到工具 '{tool_name}'"
 
+        # MCP 工具（plugin_id="mcp"）直接调用，不需要插件实例
+        if tool_info.plugin_id == "mcp":
+            try:
+                result = tool_info.func(None, **arguments)
+                if hasattr(result, "__await__"):
+                    result = await result
+                return str(result) if result is not None else ""
+            except Exception as e:
+                logger.error("MCP工具执行失败 %s: %s", tool_name, e)
+                return f"工具执行出错: {e}"
+
         plugin = self._plugins.get(tool_info.plugin_id or "")
         if plugin is None:
             return f"错误：工具 '{tool_name}' 所属插件未找到"

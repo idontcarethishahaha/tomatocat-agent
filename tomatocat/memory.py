@@ -1,6 +1,6 @@
 """记忆引擎
 
-五层记忆架构（参考 Akashic Agent）：
+五层记忆架构：
 - SELF.md          : 番茄猫自我认知，由 consolidation 更新
 - MEMORY.md        : 用户长期画像，由 consolidation 自动整合
 - PENDING.md       : 每轮对话提取的碎片记忆，待整合

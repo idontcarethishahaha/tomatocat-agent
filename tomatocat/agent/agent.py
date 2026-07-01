@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from datetime import datetime, timedelta, timezone as _tz_utc
 from pathlib import Path
 from typing import Any
 
@@ -14,6 +15,62 @@ from ..plugins.manager import PluginManager
 from .llm import LLMProvider, LLMResponse, ToolCall
 
 logger = logging.getLogger(__name__)
+
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:
+    ZoneInfo = None
+
+
+def _weekday_cn(dt: datetime) -> str:
+    days = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
+    return days[dt.weekday()]
+
+
+def build_current_session_prompt(channel: str, chat_id: str) -> str:
+    """构建当前会话信息提示，让 AI 知道当前渠道和会话 ID"""
+    return f"\n\n## 当前会话\n渠道: {channel}\n会话 ID: {chat_id}"
+
+
+def build_message_time_envelope(
+    message_time: datetime,
+    timezone_name: str = "Asia/Shanghai",
+) -> str:
+    """构建消息时间信封，附加在用户消息前。
+
+    包含：
+    - 当前消息时间（本地时区可读格式）
+    - request_time（ISO 格式，用于 schedule 工具延迟补偿）
+    - 今天/昨天/明天/后天 日期
+    - 星期
+    """
+    if ZoneInfo:
+        try:
+            tzinfo = ZoneInfo(timezone_name)
+        except Exception:
+            tzinfo = _tz_utc(timedelta(hours=8))
+    else:
+        tzinfo = _tz_utc(timedelta(hours=8))
+
+    if message_time.tzinfo is None:
+        message_time = message_time.replace(tzinfo=tzinfo)
+    else:
+        message_time = message_time.astimezone(tzinfo)
+
+    yesterday = message_time - timedelta(days=1)
+    tomorrow = message_time + timedelta(days=1)
+    day_after_tomorrow = message_time + timedelta(days=2)
+
+    return (
+        f"[当前消息时间: {message_time.strftime('%Y-%m-%d %H:%M:%S %Z')} | "
+        f"request_time={message_time.isoformat()} | "
+        f"今天={message_time.strftime('%Y-%m-%d')}（{_weekday_cn(message_time)}） | "
+        f"昨天={yesterday.strftime('%Y-%m-%d')}（{_weekday_cn(yesterday)}） | "
+        f"明天={tomorrow.strftime('%Y-%m-%d')}（{_weekday_cn(tomorrow)}） | "
+        f"后天={day_after_tomorrow.strftime('%Y-%m-%d')}（{_weekday_cn(day_after_tomorrow)}） | "
+        f"weekday={message_time.strftime('%A')} | "
+        f"相对时间以此为准]\n"
+    )
 
 
 class TomatoCatAgent:
@@ -64,14 +121,30 @@ class TomatoCatAgent:
                 logger.warning(f"[agent] 记忆上下文获取失败: {e}")
         return prompt
 
-    async def handle_message(self, session_key: str, text: str, channel: str = "cli") -> str:
+    async def handle_message(
+        self,
+        session_key: str,
+        text: str,
+        channel: str = "cli",
+        message_time: datetime | None = None,
+    ) -> str:
         """处理用户消息，返回回复"""
         session = self.session_manager.get_or_create(session_key)
 
         await self.event_bus.emit(TurnStartEvent(session_key))
 
+        # 命令拦截：/ping /status /version /help 等不经过 LLM
+        if text.strip().startswith("/"):
+            status_plugin = self.plugin_manager.plugins.get("status_commands")
+            if status_plugin:
+                cmd_reply = status_plugin.handle_command(text, session_key, channel)
+                if cmd_reply is not None:
+                    await self.event_bus.emit(TurnEndEvent(session_key, cmd_reply))
+                    return cmd_reply
+
         if not session.messages:
             system_prompt = self._build_system_with_memory()
+            system_prompt += build_current_session_prompt(channel=channel, chat_id=session_key)
             session.messages.insert(0, _system_message(system_prompt))
 
         if self.memory:
@@ -83,7 +156,15 @@ class TomatoCatAgent:
             except Exception:
                 pass
 
-        session.add_user_message(text)
+        if message_time is None:
+            message_time = datetime.now(_tz_utc.utc)
+
+        time_envelope = build_message_time_envelope(
+            message_time,
+            timezone_name=self.config.scheduler.timezone,
+        )
+        user_text_with_time = time_envelope + text
+        session.add_user_message(user_text_with_time)
 
         final_response = ""
         tools = self.plugin_manager.get_all_tools()

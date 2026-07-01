@@ -203,7 +203,7 @@ async def serve(config_path: Path, workspace: Path) -> None:
             store_path=workspace / "scheduler" / "jobs.json",
             send_fn=send_to_channel,
             agent_fn=scheduler_agent_fn,
-            timezone=config.scheduler.timezone,
+            default_tz=config.scheduler.timezone,
         )
         await scheduler.start()
 
@@ -213,9 +213,10 @@ async def serve(config_path: Path, workspace: Path) -> None:
             scheduler_plugin = scheduler_plugin_inst
             scheduler_plugin.set_scheduler(scheduler)
             scheduler_plugin.set_default_target(default_channel, default_chat_id)
-            logger.info("定时任务插件已关联")
+            scheduler_plugin.set_timezone(config.scheduler.timezone)
+            logger.info("定时任务插件已关联，默认目标: %s:%s", default_channel, default_chat_id)
 
-        logger.info("定时任务服务已启动")
+        logger.info("定时任务服务已启动，时区: %s", config.scheduler.timezone)
 
     print("\n🍅🐱 番茄猫已启动喵~ (≧∇≦)ﾉ\n")
 
