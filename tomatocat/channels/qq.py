@@ -134,9 +134,16 @@ class QQChannel(Channel):
             preview = text[:60] + "..." if len(text) > 60 else text
             logger.info("[qq] 私聊消息  user=%s  内容: %s", user_id, preview)
 
-            response = await self._handle_message(f"qq:{user_id}", text, "qq")
-            if response:
-                await self._send_private_text(user_id, response)
+            result = await self._handle_message(f"qq:{user_id}", text, "qq")
+            reply_text = result.get("text", "")
+            media_paths = result.get("media_paths", [])
+            if reply_text:
+                await self._send_private_text(user_id, reply_text)
+            for media_path in media_paths:
+                try:
+                    await self.send_image(user_id, str(media_path))
+                except Exception as e:
+                    logger.error("[qq] meme 图片发送失败: %s", e)
 
         elif msg_type == "group":
             # 群聊
@@ -167,9 +174,16 @@ class QQChannel(Channel):
             logger.info("[qq] 群聊消息  group=%s  user=%s  内容: %s", group_id, user_id, preview)
 
             response = await self._handle_message(session_key, text, "qq")
-            if response:
-                reply_text = f"[CQ:at,qq={user_id}]\n{response}"
-                await self._send_group_text(group_id, reply_text)
+            reply_text = response.get("text", "")
+            media_paths = response.get("media_paths", [])
+            if reply_text:
+                reply_with_at = f"[CQ:at,qq={user_id}]\n{reply_text}"
+                await self._send_group_text(group_id, reply_with_at)
+            for media_path in media_paths:
+                try:
+                    await self.send_image(f"{_GROUP_PREFIX}{group_id}", str(media_path))
+                except Exception as e:
+                    logger.error("[qq] meme 图片发送失败: %s", e)
 
     # ── 发送消息 API ─────────────────────────────────────────────
 

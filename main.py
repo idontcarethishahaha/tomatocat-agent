@@ -149,7 +149,7 @@ async def serve(config_path: Path, workspace: Path) -> None:
         )
         channels.append(qq_channel)
 
-    async def message_handler(session_key: str, text: str, channel: str) -> str:
+    async def message_handler(session_key: str, text: str, channel: str) -> dict:
         return await agent.handle_message(session_key, text, channel)
 
     for ch in channels:
@@ -197,7 +197,10 @@ async def serve(config_path: Path, workspace: Path) -> None:
             chat_id: str,
             session_key: str,
         ) -> str:
-            return await agent.handle_message(session_key, content, channel)
+            result = await agent.handle_message(session_key, content, channel)
+            if isinstance(result, dict):
+                return result.get("text", "")
+            return str(result)
 
         scheduler = SchedulerService(
             store_path=workspace / "scheduler" / "jobs.json",

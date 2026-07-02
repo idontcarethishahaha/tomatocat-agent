@@ -60,7 +60,8 @@ class CLISocketChannel(Channel):
 
                 response_data = json.dumps({
                     "type": "text",
-                    "content": response,
+                    "content": response.get("text", ""),
+                    "media_paths": [str(p) for p in response.get("media_paths", [])],
                 }, ensure_ascii=False)
                 writer.write((response_data + "\n").encode("utf-8"))
                 await writer.drain()

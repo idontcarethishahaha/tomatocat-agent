@@ -158,8 +158,24 @@ class TelegramChannel(Channel):
         text = update.message.text
 
         try:
-            response = await self._handle_message(session_key, text, "telegram")
-            await update.message.reply_text(response)
+            result = await self._handle_message(session_key, text, "telegram")
+            reply_text = result.get("text", "")
+            media_paths = result.get("media_paths", [])
+
+            # 先发文本
+            if reply_text.strip():
+                await update.message.reply_text(reply_text)
+
+            # 再发 meme 媒体文件
+            for media_path in media_paths:
+                path_str = str(media_path)
+                try:
+                    if path_str.lower().endswith(".gif"):
+                        await self.send_animation(str(user.id), path_str)
+                    else:
+                        await self.send_photo(str(user.id), path_str)
+                except Exception as e:
+                    logger.error("[telegram] meme 图片发送失败: %s", e)
         except Exception as e:
             logger.error("[telegram] 消息处理失败: %s", e)
             await update.message.reply_text("喵... 番茄猫出错了，等一下再试试？(・_・;)")

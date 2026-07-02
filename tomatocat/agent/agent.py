@@ -119,6 +119,14 @@ class TomatoCatAgent:
                     prompt += f"\n\n{memory_context}"
             except Exception as e:
                 logger.warning(f"[agent] 记忆上下文获取失败: {e}")
+        # 注入 meme 协议说明（只有有素材时才注入）
+        if self.meme_service:
+            try:
+                meme_block = self.meme_service.build_prompt_block()
+                if meme_block:
+                    prompt += f"\n\n{meme_block}"
+            except Exception as e:
+                logger.warning(f"[agent] meme 协议注入失败: {e}")
         return prompt
 
     async def handle_message(
@@ -127,8 +135,8 @@ class TomatoCatAgent:
         text: str,
         channel: str = "cli",
         message_time: datetime | None = None,
-    ) -> str:
-        """处理用户消息，返回回复"""
+    ) -> dict[str, Any]:
+        """处理用户消息，返回 {"text": str, "media_paths": list[Path]}"""
         session = self.session_manager.get_or_create(session_key)
 
         await self.event_bus.emit(TurnStartEvent(session_key))
@@ -140,7 +148,7 @@ class TomatoCatAgent:
                 cmd_reply = status_plugin.handle_command(text, session_key, channel)
                 if cmd_reply is not None:
                     await self.event_bus.emit(TurnEndEvent(session_key, cmd_reply))
-                    return cmd_reply
+                    return {"text": cmd_reply, "media_paths": []}
 
         if not session.messages:
             system_prompt = self._build_system_with_memory()
@@ -212,12 +220,13 @@ class TomatoCatAgent:
         if not final_response:
             final_response = "喵... 番茄猫卡住了，请再说一次？(・_・;)"
 
+        # meme 表情包处理：提取 <meme:tag> 标签，返回媒体路径
+        meme_media_paths: list[Any] = []
         if self.meme_service and final_response:
             try:
                 meme_result = self.meme_service.decorate_reply(final_response)
                 final_response = meme_result.text
-                if meme_result.media_paths:
-                    logger.info(f"[meme] 匹配到 {len(meme_result.media_paths)} 个媒体")
+                meme_media_paths = meme_result.media_paths
             except Exception as e:
                 logger.warning(f"[meme] 处理失败: {e}")
 
@@ -232,7 +241,7 @@ class TomatoCatAgent:
 
         await self.event_bus.emit(TurnEndEvent(session_key, final_response))
 
-        return final_response
+        return {"text": final_response, "media_paths": meme_media_paths}
 
     async def _post_conversation_memory(self, user_text: str, assistant_text: str) -> None:
         """对话后异步处理：提取记忆 → 定时整合"""
