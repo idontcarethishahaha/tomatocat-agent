@@ -1555,3 +1555,184 @@ ID: d1f6189a260b
 - 提醒写LeetCode题目
 - 按时完成学习...
 [2026-07-02 16:31:29,549.549] INFO     tomatocat.proactive.engine 'engine.py:137' | [proactive] 获取到 0 条新事件
+[2026-07-02 16:33:47,069.069] ERROR    telegram.ext.Updater '_updater.py:371' | Exception happened while polling for updates.
+Traceback (most recent call last):
+  File "d:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\.venv\Lib\site-packages\httpx\_transports\default.py", line 101, in map_httpcore_exceptions
+    yield
+  File "d:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\.venv\Lib\site-packages\httpx\_transports\default.py", line 394, in handle_async_request
+    resp = await self._pool.handle_async_request(req)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "d:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\.venv\Lib\site-packages\httpcore\_async\connection_pool.py", line 256, in handle_async_request
+    raise exc from None
+  File "d:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\.venv\Lib\site-packages\httpcore\_async\connection_pool.py", line 236, in handle_async_request
+    response = await connection.handle_async_request(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "d:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\.venv\Lib\site-packages\httpcore\_async\http_proxy.py", line 343, in handle_async_request
+    return await self._connection.handle_async_request(request)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "d:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\.venv\Lib\site-packages\httpcore\_async\http11.py", line 136, in handle_async_request
+    raise exc
+  File "d:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\.venv\Lib\site-packages\httpcore\_async\http11.py", line 106, in handle_async_request
+    ) = await self._receive_response_headers(**kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "d:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\.venv\Lib\site-packages\httpcore\_async\http11.py", line 177, in _receive_response_headers
+    event = await self._receive_event(timeout=timeout)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "d:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\.venv\Lib\site-packages\httpcore\_async\http11.py", line 231, in _receive_event
+    raise RemoteProtocolError(msg)
+httpcore.RemoteProtocolError: Server disconnected without sending a response.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "d:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\.venv\Lib\site-packages\telegram\request\_httpxrequest.py", line 279, in do_request
+    res = await self._client.request(
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "d:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\.venv\Lib\site-packages\httpx\_client.py", line 1540, in request
+    return await self.send(request, auth=auth, follow_redirects=follow_redirects)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "d:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\.venv\Lib\site-packages\httpx\_client.py", line 1629, in send
+    response = await self._send_handling_auth(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "d:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\.venv\Lib\site-packages\httpx\_client.py", line 1657, in _send_handling_auth
+    response = await self._send_handling_redirects(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "d:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\.venv\Lib\site-packages\httpx\_client.py", line 1694, in _send_handling_redirects
+    response = await self._send_single_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "d:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\.venv\Lib\site-packages\httpx\_client.py", line 1730, in _send_single_request
+    response = await transport.handle_async_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "d:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\.venv\Lib\site-packages\httpx\_transports\default.py", line 393, in handle_async_request
+    with map_httpcore_exceptions():
+         ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\uv-python\cpython-3.12.7-windows-x86_64-none\Lib\contextlib.py", line 158, in __exit__
+    self.gen.throw(value)
+  File "d:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\.venv\Lib\site-packages\httpx\_transports\default.py", line 118, in map_httpcore_exceptions
+    raise mapped_exc(message) from exc
+httpx.RemoteProtocolError: Server disconnected without sending a response.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "d:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\.venv\Lib\site-packages\telegram\ext\_utils\networkloop.py", line 161, in network_retry_loop
+    await do_action()
+  File "d:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\.venv\Lib\site-packages\telegram\ext\_utils\networkloop.py", line 154, in do_action
+    action_cb_task.result()
+  File "d:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\.venv\Lib\site-packages\telegram\ext\_updater.py", line 340, in polling_action_cb
+    updates = await self.bot.get_updates(
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "d:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\.venv\Lib\site-packages\telegram\ext\_extbot.py", line 680, in get_updates
+    updates = await super().get_updates(
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "d:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\.venv\Lib\site-packages\telegram\_bot.py", line 4767, in get_updates
+    await self._post(
+  File "d:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\.venv\Lib\site-packages\telegram\_bot.py", line 712, in _post
+    return await self._do_post(
+           ^^^^^^^^^^^^^^^^^^^^
+  File "d:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\.venv\Lib\site-packages\telegram\ext\_extbot.py", line 378, in _do_post
+    return await super()._do_post(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "d:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\.venv\Lib\site-packages\telegram\_bot.py", line 741, in _do_post
+    result = await request.post(
+             ^^^^^^^^^^^^^^^^^^^
+  File "d:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\.venv\Lib\site-packages\telegram\request\_baserequest.py", line 198, in post
+    result = await self._request_wrapper(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "d:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\.venv\Lib\site-packages\telegram\request\_baserequest.py", line 305, in _request_wrapper
+    code, payload = await self.do_request(
+                    ^^^^^^^^^^^^^^^^^^^^^^
+  File "d:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\.venv\Lib\site-packages\telegram\request\_httpxrequest.py", line 303, in do_request
+    raise NetworkError(f"httpx.{err.__class__.__name__}: {err}") from err
+telegram.error.NetworkError: httpx.RemoteProtocolError: Server disconnected without sending a response.
+[2026-07-02 16:33:47,070.070] INFO     Adapter 'adapter.py:110' | NapCat WebSocket 连接已关闭, 正在尝试重新连接...
+[2026-07-02 16:33:47,099.099] INFO     Adapter 'adapter.py:118' | NapCat WebSocket 重新连接成功
+[2026-07-02 16:33:47,099.099] INFO     tomatocat.channels.qq 'qq.py:149' | [qq] NcatBot 已启动
+[2026-07-02 16:33:47,099.099] INFO     Client 'client.py:121' | Bot 3834637415 启动成功
+[2026-07-02 16:34:29,584.584] INFO     tomatocat.proactive.engine 'engine.py:137' | [proactive] 获取到 0 条新事件
+[2026-07-02 16:34:35,086.086] INFO     tomatocat.scheduler 'scheduler.py:421' | [scheduler] 触发任务 '写题提醒' mode=soft channel=telegram:telegram:8824997206
+[2026-07-02 16:34:35,086.086] INFO     tomatocat.session '__init__.py:87' | [session] 创建新会话: scheduler:29aaede3-b0f9-4680-aae2-f444ba0e3d3c
+[2026-07-02 16:34:35,089.089] INFO     tomatocat.agent.agent 'agent.py:278' | [agent] meme 协议已注入，长度 496 字符
+[2026-07-02 16:34:35,388.388] INFO     tomatocat.agent.agent 'agent.py:323' | [agent] 找到 3 条相关记忆
+[2026-07-02 16:34:35,388.388] INFO     tomatocat.agent.agent 'agent.py:360' | [agent] 第 1 轮推理
+[2026-07-02 16:34:43,545.545] INFO     tomatocat.agent.agent 'agent.py:416' | [agent] 调用工具: schedule({'tier': 'instant', 'trigger': 'after', 'when': '5m', 'message': '喵~ 吴文，该写LeetCode题目啦！今天的目标是刷3道题，加油！(=^･ω･^=)', 'channel': 'telegram', 'chat_id': 'scheduler:29aaede3-b0f9-4680-aae2-f444ba0e3d3c', 'request_time': '2026-07-02T16:34:35.388978+08:00'})
+[2026-07-02 16:34:43,548.548] INFO     tomatocat.scheduler 'scheduler.py:369' | [scheduler] 任务已添加: 16397d98 (unnamed) trigger=after mode=instant fire_at=2026-07-02 08:39:35 UTC
+[2026-07-02 16:34:43,549.549] INFO     tomatocat.agent.agent 'agent.py:418' | [agent] 工具结果: ⏰ 已设置定时任务 16397d98
+5m后（约 2026-07-02 16:39:35）
+内容: 喵~ 吴文，该写LeetCode题目啦！今天的目标是刷3道题，加油！(=^･ω･
+[2026-07-02 16:34:43,549.549] INFO     tomatocat.agent.agent 'agent.py:360' | [agent] 第 2 轮推理
+[2026-07-02 16:34:46,792.792] INFO     tomatocat.scheduler 'scheduler.py:468' | [scheduler] soft AI 完成 '写题提醒'  耗时=11.7s  P90=25.0s
+[2026-07-02 16:34:48,075.075] INFO     tomatocat.channels.telegram 'telegram.py:146' | [telegram] 主动消息已发送至 8824997206
+[2026-07-02 16:34:48,075.075] INFO     tomatocat.scheduler 'scheduler.py:475' | [scheduler] soft 推送完成 '写题提醒'
+[2026-07-02 16:34:49,253.253] INFO     tomatocat.memory 'memory.py:342' | [memory] 提取记忆到 PENDING: - 吴文今日学习计划包括写LeetCode题目
+- 已为吴文设置提醒，5分钟后提醒写LeetCode题目
+- 吴文今日学...
+[2026-07-02 16:37:24,700.700] INFO     tomatocat.agent.agent 'agent.py:323' | [agent] 找到 3 条相关记忆
+[2026-07-02 16:37:24,700.700] INFO     tomatocat.agent.agent 'agent.py:360' | [agent] 第 1 轮推理
+[2026-07-02 16:37:29,600.600] INFO     tomatocat.proactive.engine 'engine.py:137' | [proactive] 获取到 0 条新事件
+[2026-07-02 16:37:31,651.651] INFO     tomatocat.agent.agent 'agent.py:416' | [agent] 调用工具: schedule({'tier': 'soft', 'trigger': 'at', 'when': '16:42', 'name': '喝水提醒', 'message': '该喝水了喵~记得多喝水哦！(≧∇≦)ﾉ', 'prompt': '提醒用户喝水，保持身体水分充足', 'chat_id': 'telegram:8824997206', 'request_time': '2026-07-02T16:37:24.700022+08:00'})
+[2026-07-02 16:37:31,653.653] INFO     tomatocat.scheduler 'scheduler.py:369' | [scheduler] 任务已添加: fca6b077 (喝水提醒) trigger=at mode=soft fire_at=2026-07-02 08:42:00 UTC
+[2026-07-02 16:37:31,654.654] INFO     tomatocat.agent.agent 'agent.py:418' | [agent] 工具结果: ⏰ 已设置 AI 定时任务 「喝水提醒」
+在 2026-07-02 16:42:00
+提示词: 提醒用户喝水，保持身体水分充足
+[2026-07-02 16:37:31,654.654] INFO     tomatocat.agent.agent 'agent.py:360' | [agent] 第 2 轮推理
+[2026-07-02 16:37:34,790.790] INFO     tomatocat.memory 'memory.py:342' | [memory] 提取记忆到 PENDING: - 用户要求在16:42时提醒喝水
+- 番茄猫已设置16:42的喝水提醒...
+[2026-07-02 16:39:36,118.118] INFO     tomatocat.scheduler 'scheduler.py:421' | [scheduler] 触发任务 '16397d98' mode=instant channel=telegram:scheduler:29aaede3-b0f9-4680-aae2-f444ba0e3d3c
+[2026-07-02 16:39:37,888.888] WARNING  tomatocat.channels.telegram 'telegram.py:160' | [telegram] 网络错误 (attempt 1): Chat not found
+[2026-07-02 16:39:41,708.708] WARNING  tomatocat.channels.telegram 'telegram.py:160' | [telegram] 网络错误 (attempt 2): Chat not found
+[2026-07-02 16:39:45,529.529] WARNING  tomatocat.channels.telegram 'telegram.py:160' | [telegram] 网络错误 (attempt 3): Chat not found
+[2026-07-02 16:39:45,529.529] ERROR    tomatocat.channels.telegram 'telegram.py:166' | [telegram] 主动消息发送失败（网络错误重试耗尽）: Chat not found
+[2026-07-02 16:39:45,529.529] INFO     tomatocat.scheduler 'scheduler.py:451' | [scheduler] instant 推送完成 '16397d98'
+[2026-07-02 16:40:29,617.617] INFO     tomatocat.proactive.engine 'engine.py:137' | [proactive] 获取到 0 条新事件
+[2026-07-02 16:41:35,273.273] INFO     tomatocat.scheduler 'scheduler.py:421' | [scheduler] 触发任务 '喝水提醒' mode=soft channel=telegram:telegram:8824997206
+[2026-07-02 16:41:35,274.274] INFO     tomatocat.session '__init__.py:87' | [session] 创建新会话: scheduler:fca6b077-d889-4731-bc49-9c9203926d0b
+[2026-07-02 16:41:35,275.275] INFO     tomatocat.agent.agent 'agent.py:278' | [agent] meme 协议已注入，长度 496 字符
+[2026-07-02 16:41:35,829.829] INFO     tomatocat.agent.agent 'agent.py:323' | [agent] 找到 3 条相关记忆
+[2026-07-02 16:41:35,830.830] INFO     tomatocat.agent.agent 'agent.py:360' | [agent] 第 1 轮推理
+[2026-07-02 16:41:45,576.576] INFO     tomatocat.agent.agent 'agent.py:416' | [agent] 调用工具: schedule({'tier': 'soft', 'trigger': 'after', 'when': '30m', 'message': '该喝水了喵~保持身体水分充足很重要哦！(≧∇≦)ﾉ', 'channel': 'telegram', 'chat_id': 'scheduler:fca6b077-d889-4731-bc49-9c9203926d0b'})
+[2026-07-02 16:41:45,576.576] INFO     tomatocat.agent.agent 'agent.py:418' | [agent] 工具结果: 喵？tier=soft 时 prompt 为必填项 (・_・;)
+[2026-07-02 16:41:45,578.578] INFO     tomatocat.agent.agent 'agent.py:360' | [agent] 第 2 轮推理
+[2026-07-02 16:41:48,686.686] INFO     tomatocat.agent.agent 'agent.py:416' | [agent] 调用工具: schedule({'tier': 'instant', 'trigger': 'after', 'when': '30m', 'message': '该喝水了喵~保持身体水分充足很重要哦！(≧∇≦)ﾉ', 'channel': 'telegram', 'chat_id': 'scheduler:fca6b077-d889-4731-bc49-9c9203926d0b'})
+[2026-07-02 16:41:48,690.690] INFO     tomatocat.scheduler 'scheduler.py:369' | [scheduler] 任务已添加: 4f8d2927 (unnamed) trigger=after mode=instant fire_at=2026-07-02 09:11:48 UTC
+[2026-07-02 16:41:48,690.690] INFO     tomatocat.agent.agent 'agent.py:418' | [agent] 工具结果: ⏰ 已设置定时任务 4f8d2927
+30m后（约 2026-07-02 17:11:48）
+内容: 该喝水了喵~保持身体水分充足很重要哦！(≧∇≦)ﾉ
+[2026-07-02 16:41:48,692.692] INFO     tomatocat.agent.agent 'agent.py:360' | [agent] 第 3 轮推理
+[2026-07-02 16:41:51,908.908] INFO     tomatocat.scheduler 'scheduler.py:468' | [scheduler] soft AI 完成 '喝水提醒'  耗时=16.6s  P90=25.0s
+[2026-07-02 16:41:53,485.485] INFO     tomatocat.channels.telegram 'telegram.py:146' | [telegram] 主动消息已发送至 8824997206
+[2026-07-02 16:41:53,486.486] INFO     tomatocat.scheduler 'scheduler.py:475' | [scheduler] soft 推送完成 '喝水提醒'
+[2026-07-02 16:41:54,478.478] INFO     tomatocat.memory 'memory.py:342' | [memory] 提取记忆到 PENDING: - 喝水提醒已设置
+- 时间：30分钟后（约17:11）
+- 内容：该喝水了喵~保持身体水分充足很重要哦！...
+[2026-07-02 16:42:48,920.920] INFO     tomatocat.agent.agent 'agent.py:323' | [agent] 找到 3 条相关记忆
+[2026-07-02 16:42:48,921.921] INFO     tomatocat.agent.agent 'agent.py:360' | [agent] 第 1 轮推理
+[2026-07-02 16:42:54,216.216] INFO     tomatocat.memory 'memory.py:342' | [memory] 提取记忆到 PENDING: - 吴文希望被叫名字
+- 番茄猫会叫吴文
+- 吴文设置了喝水提醒...
+[2026-07-02 16:43:29,622.622] INFO     tomatocat.proactive.engine 'engine.py:137' | [proactive] 获取到 0 条新事件
+[2026-07-02 16:44:17,950.950] INFO     tomatocat.agent.agent 'agent.py:323' | [agent] 找到 3 条相关记忆
+[2026-07-02 16:44:17,951.951] INFO     tomatocat.agent.agent 'agent.py:360' | [agent] 第 1 轮推理
+[2026-07-02 16:44:20,534.534] INFO     tomatocat.agent.agent 'agent.py:416' | [agent] 调用工具: cancel_schedule({'name': '喝水提醒'})
+[2026-07-02 16:44:20,535.535] INFO     tomatocat.agent.agent 'agent.py:418' | [agent] 工具结果: 没有找到名为 '喝水提醒' 的任务哦 (・_・;)
+[2026-07-02 16:44:20,535.535] INFO     tomatocat.agent.agent 'agent.py:360' | [agent] 第 2 轮推理
+[2026-07-02 16:44:21,632.632] INFO     tomatocat.agent.agent 'agent.py:416' | [agent] 调用工具: list_schedules({})
+[2026-07-02 16:44:21,634.634] INFO     tomatocat.agent.agent 'agent.py:418' | [agent] 工具结果: ⏰ 定时任务列表（共 1 个）：
+1. 4f8d2927 [instant/倒计时]
+   下次: 2026-07-02 17:11:48
+   内容: 该喝水了喵~保持身体水分充足很重要哦！(≧∇≦)ﾉ...
+   已运行: 0次
+[2026-07-02 16:44:21,634.634] INFO     tomatocat.agent.agent 'agent.py:360' | [agent] 第 3 轮推理
+[2026-07-02 16:44:22,703.703] INFO     tomatocat.agent.agent 'agent.py:416' | [agent] 调用工具: cancel_schedule({'id': '4f8d2927'})
+[2026-07-02 16:44:22,704.704] INFO     tomatocat.scheduler 'scheduler.py:384' | [scheduler] 任务已取消: 4f8d2927 (unnamed)
+[2026-07-02 16:44:22,704.704] INFO     tomatocat.agent.agent 'agent.py:418' | [agent] 工具结果: 已取消 1 个任务 (｡•ᴗ-｡)♡
+[2026-07-02 16:44:22,705.705] INFO     tomatocat.agent.agent 'agent.py:360' | [agent] 第 4 轮推理
+[2026-07-02 16:44:26,012.012] INFO     tomatocat.memory 'memory.py:342' | [memory] 提取记忆到 PENDING: - 吴文请求取消17:11的喝水提醒
+- 番茄猫已成功取消吴文的17:11喝水提醒...
+[2026-07-02 16:46:16,701.701] INFO     tomatocat 'main.py:232' | 收到退出信号，正在关闭...
+[2026-07-02 16:46:16,702.702] INFO     tomatocat.proactive.engine 'engine.py:273' | [proactive] 已停止
+[2026-07-02 16:46:16,702.702] INFO     tomatocat.scheduler 'scheduler.py:320' | [scheduler] 定时任务服务已停止
+[2026-07-02 16:46:17,988.988] INFO     tomatocat.channels.qq 'qq.py:163' | [qq] QQ 渠道已停止
+[2026-07-02 16:46:18,002.002] INFO     tomatocat.mcp_client 'mcp_client.py:191' | [mcp] weather 已关闭
+[2026-07-02 16:46:18,006.006] INFO     tomatocat.mcp_client 'mcp_client.py:191' | [mcp] arxiv 已关闭
+[2026-07-02 16:46:18,007.007] INFO     tomatocat.mcp_client 'mcp_client.py:272' | [mcp] 所有连接已关闭

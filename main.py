@@ -1,7 +1,9 @@
-"""🍅🐱 番茄猫 TomatoCat - 像素猫 AI 桌面助手
+"""🍅🐱 番茄猫 TomatoCat - 像素猫 AI 桌面助手（融合版）
+
+整合了 DesktopPet 的桌面窗口 UI 和 TomatoCat 的 Agent 系统。
 
 用法:
-  python main.py                     启动番茄猫
+  python main.py                     启动番茄猫桌面宠物
   python main.py --workspace DIR     指定工作目录
   python main.py --config PATH       指定配置文件
 """
@@ -12,7 +14,11 @@ import asyncio
 import logging
 import signal
 import sys
+import os
+import threading
+import json
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).parent
 CONFIG_FILE = ROOT / "config.toml"
@@ -34,8 +40,33 @@ logging.getLogger("chromadb").setLevel(logging.WARNING)
 
 logger = logging.getLogger("tomatocat")
 
+_lock_path = ROOT / ".pet-lock"
 
-async def serve(config_path: Path, workspace: Path) -> None:
+
+def _acquire_lock():
+    if _lock_path.exists():
+        try:
+            old_pid = int(_lock_path.read_text().strip())
+            import ctypes
+            kernel32 = ctypes.windll.kernel32
+            handle = kernel32.OpenProcess(0x0400, False, old_pid)
+            if handle:
+                kernel32.CloseHandle(handle)
+                return False
+        except:
+            pass
+    _lock_path.write_text(str(os.getpid()))
+    return True
+
+
+def _release_lock():
+    try:
+        _lock_path.unlink()
+    except:
+        pass
+
+
+async def _start_agent(config_path: Path, workspace: Path):
     from tomatocat.config import Config
     from tomatocat.bus import EventBus
     from tomatocat.session import SessionManager
@@ -51,7 +82,7 @@ async def serve(config_path: Path, workspace: Path) -> None:
     from tomatocat.proactive.engine import ProactiveEngine
     from tomatocat.scheduler import SchedulerService
 
-    print("\n🍅🐱 番茄猫 TomatoCat 启动中...")
+    print("\n🍅🐱 番茄猫 Agent 启动中...")
     print(f"   配置文件: {config_path}")
     print(f"   工作目录: {workspace}")
     print("")
@@ -118,7 +149,6 @@ async def serve(config_path: Path, workspace: Path) -> None:
         meme_service=meme_service,
     )
 
-    # 启动时检查是否有未整合的 PENDING 记忆
     if memory and memory.should_consolidate():
         logger.info("[memory] 检测到未整合的 PENDING 记忆，启动时自动整合...")
         try:
@@ -185,8 +215,6 @@ async def serve(config_path: Path, workspace: Path) -> None:
         plugin_manager.proactive = proactive
         logger.info(f"主动推送已启动，目标: {config.proactive.target.channel}")
 
-    # ── 定时任务 Scheduler ──────────────────────────────────────
-
     scheduler = None
     scheduler_plugin = None
     if config.scheduler.enabled:
@@ -212,7 +240,6 @@ async def serve(config_path: Path, workspace: Path) -> None:
         )
         await scheduler.start()
 
-        # 找到 scheduler 插件并关联
         scheduler_plugin_inst = plugin_manager.plugins.get("scheduler")
         if scheduler_plugin_inst:
             scheduler_plugin = scheduler_plugin_inst
@@ -223,36 +250,84 @@ async def serve(config_path: Path, workspace: Path) -> None:
 
         logger.info("定时任务服务已启动，时区: %s", config.scheduler.timezone)
 
-    print("\n🍅🐱 番茄猫已启动喵~ (≧∇≦)ﾉ\n")
+    print("\n🍅🐱 番茄猫 Agent 已就绪喵~ (≧∇≦)ﾉ\n")
 
-    stop_event = asyncio.Event()
-    loop = asyncio.get_running_loop()
+    return {
+        "agent": agent,
+        "config": config,
+        "plugin_manager": plugin_manager,
+        "memory": memory,
+        "meme_service": meme_service,
+        "channels": channels,
+        "proactive": proactive,
+        "scheduler": scheduler,
+        "mcp_client": mcp_client,
+        "send_to_channel": send_to_channel,
+    }
 
-    def _signal_handler() -> None:
-        logger.info("收到退出信号，正在关闭...")
-        stop_event.set()
 
-    for sig in (signal.SIGINT, signal.SIGTERM):
-        try:
-            loop.add_signal_handler(sig, _signal_handler)
-        except NotImplementedError:
-            signal.signal(sig, lambda *_: loop.call_soon_threadsafe(_signal_handler))
+def _run_qt_app(agent_context):
+    from PyQt6.QtWidgets import QApplication, QMessageBox
+    from PyQt6.QtCore import Qt, QTimer
+    import time
 
+    QApplication.setHighDpiScaleFactorRoundingPolicy(
+        Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
+    )
+    app = QApplication(sys.argv)
+    app.setApplicationName("TomatoCat")
+    app.setQuitOnLastWindowClosed(False)
+
+    from pet_window import PetWindow
+    from error_log import log_error, log_startup, log_shutdown
+
+    start_time = time.time()
+    log_startup()
+
+    exit_code = 0
     try:
-        await stop_event.wait()
+        pet = PetWindow(agent_context=agent_context)
+        pet.show()
+
+        def health_check():
+            if not pet.isVisible():
+                log_error("Health check: window not visible, re-showing")
+                pet.show()
+                pet.raise_()
+        QTimer.singleShot(3000, health_check)
+
+        hour = time.localtime().tm_hour
+        if 23 <= hour or hour < 6:
+            pet.sys._enter_sleep()
+
+        cb_timer = QTimer(pet)
+        cb_timer.timeout.connect(pet.check_clipboard)
+        cb_timer.start(2000)
+
+        def proactive_loop():
+            if not pet.sys.is_sleeping and pet.sys.mood < 30:
+                pet.sys.show_bubble("有点寂寞...来跟我聊聊天喵~")
+
+        mood_timer = QTimer(pet)
+        mood_timer.timeout.connect(proactive_loop)
+        mood_timer.start(120000)
+
+        exit_code = app.exec()
+
+    except Exception as e:
+        log_error("Fatal crash", exc_info=True)
+        exit_code = 1
     finally:
-        if proactive:
-            await proactive.stop()
-        if scheduler:
-            await scheduler.stop()
-        for ch in channels:
-            try:
-                await ch.stop()
-            except Exception as e:
-                logger.error("渠道关闭失败: %s", e)
-        await plugin_manager.unload_all()
-        await mcp_client.close()
-        print("\n🍅🐱 番茄猫下线了，晚安~ (=￣ω￣=)")
+        log_shutdown()
+        _release_lock()
+
+    runtime = time.time() - start_time
+    if runtime < 10 and exit_code != 0:
+        log_error(f"Watchdog restart (runtime={runtime:.1f}s)")
+        time.sleep(1)
+        subprocess.Popen([sys.executable, __file__])
+
+    return exit_code
 
 
 def _get_flag_value(args: list[str], flag: str) -> str | None:
@@ -282,7 +357,17 @@ def main() -> None:
     if workspace_value:
         workspace = Path(workspace_value)
 
-    asyncio.run(serve(config_path, workspace))
+    if not _acquire_lock():
+        print("番茄猫已经在运行中啦~")
+        sys.exit(0)
+
+    try:
+        agent_context = asyncio.run(_start_agent(config_path, workspace))
+        _run_qt_app(agent_context)
+    except Exception as e:
+        logger.error(f"启动失败: {e}", exc_info=True)
+        _release_lock()
+        sys.exit(1)
 
 
 if __name__ == "__main__":
