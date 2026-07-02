@@ -281,12 +281,11 @@ class QQChannel(Channel):
         raw = str(chat_id)
         if raw.startswith("qq:"):
             raw = raw[3:]
-        cq = self._path_to_cq_image(image_path)
         if raw.startswith(_GROUP_PREFIX):
             group_id = raw[len(_GROUP_PREFIX):]
-            await self._send_group_text(group_id, cq)
+            await self._send_group_image(group_id, image_path)
         else:
-            await self._send_private_text(raw, cq)
+            await self._send_private_image(raw, image_path)
 
     def _path_to_cq_image(self, path: str) -> str:
         if path.startswith(("http://", "https://")):
@@ -300,28 +299,54 @@ class QQChannel(Channel):
             return f"[CQ:image,file={path}]"
 
     async def _send_private_text(self, user_id: str, text: str) -> None:
-        if not self._api:
+        if not self._api or self._bot_loop is None:
             return
         try:
-            await asyncio.to_thread(
-                self._api.send_private_msg,
-                user_id=user_id,
-                message=text,
+            msg_segments = [{"type": "text", "data": {"text": text}}]
+            fut = asyncio.run_coroutine_threadsafe(
+                self._api.send_private_msg(user_id=user_id, message=msg_segments),
+                self._bot_loop,
             )
+            await asyncio.wrap_future(fut)
         except Exception as e:
             logger.error("[qq] 私聊消息发送失败: %s", e)
 
     async def _send_group_text(self, group_id: str, text: str) -> None:
-        if not self._api:
+        if not self._api or self._bot_loop is None:
             return
         try:
-            await asyncio.to_thread(
-                self._api.send_group_msg,
-                group_id=group_id,
-                message=text,
+            msg_segments = [{"type": "text", "data": {"text": text}}]
+            fut = asyncio.run_coroutine_threadsafe(
+                self._api.send_group_msg(group_id=group_id, message=msg_segments),
+                self._bot_loop,
             )
+            await asyncio.wrap_future(fut)
         except Exception as e:
             logger.error("[qq] 群聊消息发送失败: %s", e)
+
+    async def _send_private_image(self, user_id: str, image_path: str) -> None:
+        if not self._api or self._bot_loop is None:
+            return
+        try:
+            fut = asyncio.run_coroutine_threadsafe(
+                self._api.send_private_image(user_id=user_id, image=image_path),
+                self._bot_loop,
+            )
+            await asyncio.wrap_future(fut)
+        except Exception as e:
+            logger.error("[qq] 私聊图片发送失败: %s", e)
+
+    async def _send_group_image(self, group_id: str, image_path: str) -> None:
+        if not self._api or self._bot_loop is None:
+            return
+        try:
+            fut = asyncio.run_coroutine_threadsafe(
+                self._api.send_group_image(group_id=group_id, image=image_path),
+                self._bot_loop,
+            )
+            await asyncio.wrap_future(fut)
+        except Exception as e:
+            logger.error("[qq] 群聊图片发送失败: %s", e)
 
     # ── 图片下载 ───────────────────────────────────────────────────
 
