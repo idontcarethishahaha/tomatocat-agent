@@ -41,28 +41,65 @@ logging.getLogger("chromadb").setLevel(logging.WARNING)
 logger = logging.getLogger("tomatocat")
 
 _lock_path = ROOT / ".pet-lock"
+_mutex_handle = None
+
+
+def _try_acquire_mutex() -> bool:
+    """使用 Windows 命名互斥量做单实例检测（最可靠，进程退出自动释放）"""
+    global _mutex_handle
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        mutex_name = "Global\\TomatoCatDesktopPet"
+        kernel32 = ctypes.windll.kernel32
+
+        handle = kernel32.CreateMutexW(None, False, mutex_name)
+        if handle == 0:
+            return False
+
+        ERROR_ALREADY_EXISTS = 183
+        last_error = kernel32.GetLastError()
+        if last_error == ERROR_ALREADY_EXISTS:
+            kernel32.CloseHandle(handle)
+            return False
+
+        _mutex_handle = handle
+        return True
+    except Exception:
+        return False
+
+
+def _release_mutex():
+    """释放命名互斥量"""
+    global _mutex_handle
+    if _mutex_handle:
+        try:
+            import ctypes
+            ctypes.windll.kernel32.CloseHandle(_mutex_handle)
+        except Exception:
+            pass
+        _mutex_handle = None
 
 
 def _acquire_lock():
-    if _lock_path.exists():
-        try:
-            old_pid = int(_lock_path.read_text().strip())
-            import ctypes
-            kernel32 = ctypes.windll.kernel32
-            handle = kernel32.OpenProcess(0x0400, False, old_pid)
-            if handle:
-                kernel32.CloseHandle(handle)
-                return False
-        except:
-            pass
-    _lock_path.write_text(str(os.getpid()))
+    if not _try_acquire_mutex():
+        print("番茄猫已经在运行中啦~")
+        return False
+
+    try:
+        _lock_path.write_text(str(os.getpid()))
+    except Exception:
+        pass
     return True
 
 
 def _release_lock():
+    _release_mutex()
     try:
-        _lock_path.unlink()
-    except:
+        if _lock_path.exists():
+            _lock_path.unlink()
+    except Exception:
         pass
 
 
@@ -289,6 +326,28 @@ def _run_qt_app(agent_context):
         pet = PetWindow(agent_context=agent_context)
         pet.show()
 
+        def _sigint_handler(*args):
+            logger.info("收到中断信号，正在退出...")
+            try:
+                pet.sys.save_and_cleanup()
+            except Exception:
+                pass
+            QApplication.quit()
+
+        import signal
+        try:
+            signal.signal(signal.SIGINT, _sigint_handler)
+            signal.signal(signal.SIGTERM, _sigint_handler)
+        except (ValueError, OSError):
+            pass
+
+        def _poll_signals():
+            pass
+
+        sig_timer = QTimer(pet)
+        sig_timer.timeout.connect(_poll_signals)
+        sig_timer.start(500)
+
         def health_check():
             if not pet.isVisible():
                 log_error("Health check: window not visible, re-showing")
@@ -361,13 +420,17 @@ def main() -> None:
         print("番茄猫已经在运行中啦~")
         sys.exit(0)
 
+    import atexit
+    atexit.register(_release_lock)
+
     try:
         agent_context = asyncio.run(_start_agent(config_path, workspace))
         _run_qt_app(agent_context)
     except Exception as e:
         logger.error(f"启动失败: {e}", exc_info=True)
-        _release_lock()
         sys.exit(1)
+    finally:
+        _release_lock()
 
 
 if __name__ == "__main__":

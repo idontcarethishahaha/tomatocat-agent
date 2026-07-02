@@ -197,7 +197,9 @@ class TelegramChannel(Channel):
     def _is_allowed(self, username: str | None) -> bool:
         if not self.allow_from:
             return True
-        return username in self.allow_from
+        if not username:
+            return False
+        return username.lower() in [u.lower() for u in self.allow_from]
 
     async def _start_cmd(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         user = update.effective_user
@@ -253,7 +255,16 @@ class TelegramChannel(Channel):
         if not user or not update.message or not update.message.text:
             return
 
+        logger.info(
+            f"[telegram] 收到消息: user_id={user.id}, username={user.username}, "
+            f"first_name={user.first_name}, text={update.message.text[:50]}"
+        )
+
         if not self._is_allowed(user.username):
+            logger.warning(
+                f"[telegram] 用户被拒绝: username={user.username}, "
+                f"allow_from={self.allow_from}"
+            )
             await update.message.reply_text("你没有权限使用番茄猫哦 (・_・;)")
             return
 

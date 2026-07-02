@@ -5,7 +5,7 @@ import asyncio
 from pathlib import Path
 
 from PyQt6.QtWidgets import QWidget, QApplication, QLabel
-from PyQt6.QtCore import Qt, QTimer, QPoint, QSize
+from PyQt6.QtCore import Qt, QTimer, QPoint, QSize, pyqtSignal
 from PyQt6.QtGui import (QPainter, QColor, QMovie,
                           QDragEnterEvent, QDropEvent, QMouseEvent)
 
@@ -36,6 +36,9 @@ ANIMATION_MAP = {
 
 
 class PetWindow(QWidget):
+    _analysis_done = pyqtSignal(str)
+    _analysis_error = pyqtSignal(str)
+
     def __init__(self, agent_context=None):
         super().__init__()
         self.agent_context = agent_context
@@ -56,6 +59,9 @@ class PetWindow(QWidget):
 
         self._anim_name = "idle"
         self.set_animation("idle")
+
+        self._analysis_done.connect(self._on_analysis_done)
+        self._analysis_error.connect(self._on_analysis_error)
 
         self.sys.restore_position()
 
@@ -188,7 +194,8 @@ class PetWindow(QWidget):
         if urls:
             path = urls[0].toLocalFile()
             self.sys.boost_mood(10)
-            self.set_animation("happy", 2000)
+            self.set_animation("think", 0)
+            self.sys.show_bubble("分析中...")
             threading.Thread(target=self._analyze_file, args=(path,),
                              daemon=True).start()
         event.acceptProposedAction()
@@ -196,8 +203,6 @@ class PetWindow(QWidget):
     def _analyze_file(self, path):
         try:
             system, user = build_analysis_prompt(path)
-            msgs = [{"role": "system", "content": system},
-                    {"role": "user", "content": user}]
 
             if self.agent_context and "agent" in self.agent_context:
                 async def _call_agent():
@@ -209,13 +214,22 @@ class PetWindow(QWidget):
             else:
                 result = f"文件分析功能需要配置 LLM。路径: {path}"
 
-            if self._chat is None:
-                self._chat = ChatBubble(agent_context=self.agent_context)
-                self._chat.closed.connect(self._on_chat_closed)
-            self._chat.show_analysis(result)
-            self._chat.position_near(self.geometry())
+            self._analysis_done.emit(result)
         except Exception as e:
             log_error(f"File analysis failed: {e}", exc_info=True)
+            self._analysis_error.emit(str(e))
+
+    def _on_analysis_done(self, text):
+        if self._chat is None:
+            self._chat = ChatBubble(agent_context=self.agent_context)
+            self._chat.closed.connect(self._on_chat_closed)
+        self._chat.show_analysis(text)
+        self._chat.position_near(self.geometry())
+        self.set_animation("idle", 0)
+
+    def _on_analysis_error(self, err):
+        self.sys.show_bubble(f"分析失败: {err[:20]}")
+        self.set_animation("idle", 0)
 
     def _open_chat(self):
         if self._chat is None:
