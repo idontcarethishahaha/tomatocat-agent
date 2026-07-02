@@ -86,11 +86,12 @@ class ChatBubble(QWidget):
     _result_signal = pyqtSignal(str)
     _error_signal = pyqtSignal(str)
 
-    def __init__(self, parent=None, agent_context=None):
+    def __init__(self, parent=None, agent_context=None, agent_loop=None):
         super().__init__(parent)
         self.setWindowFlags(Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.agent_context = agent_context
+        self.agent_loop = agent_loop
         self._history = []
         self._streaming = False
         self._theme = _get_theme()
@@ -220,7 +221,7 @@ class ChatBubble(QWidget):
         self._save_history()
         self._streaming = True
 
-        if self.agent_context and "agent" in self.agent_context:
+        if self.agent_context and "agent" in self.agent_context and self.agent_loop:
             self._append_text("🐾 番茄猫", self._theme["assistant_color"], "思考中...")
             threading.Thread(target=self._call_agent, args=(text,), daemon=True).start()
         else:
@@ -231,13 +232,14 @@ class ChatBubble(QWidget):
 
     def _call_agent(self, user_text):
         try:
-            async def _call():
+            async def _agent_call():
                 result = await self.agent_context["agent"].handle_message(
                     "desktop_chat", user_text, "desktop"
                 )
                 return result.get("text", "")
 
-            result = asyncio.run(_call())
+            future = asyncio.run_coroutine_threadsafe(_agent_call(), self.agent_loop)
+            result = future.result(timeout=120)
             self._result_signal.emit(result)
         except Exception as e:
             self._error_signal.emit(str(e))
