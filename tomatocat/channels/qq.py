@@ -109,11 +109,14 @@ class QQChannel(Channel):
                 return
 
             raw: str = event.raw_message
-            text, img_urls = _extract_cq_images(raw)
-            preview = text[:60] + "..." if len(text) > 60 else text
-            logger.info("[qq] 私聊消息  user=%s  内容: %s  图片: %d", user_id, preview, len(img_urls))
+            text, _ = _extract_cq_images(raw)
 
-            self._submit_to_main_loop(self._handle_private(user_id, text, img_urls))
+            # 从 ncatbot 消息段提取图片（比 CQ 码更可靠）
+            image_segs = event.message.filter_image() if hasattr(event.message, 'filter_image') else []
+            preview = text[:60] + "..." if len(text) > 60 else text
+            logger.info("[qq] 私聊消息  user=%s  内容: %s  图片: %d", user_id, preview, len(image_segs))
+
+            self._submit_to_main_loop(self._handle_private(user_id, text, image_segs))
 
         @cast(Any, self._bot.on_group_message())
         async def _(event: Any) -> None:
@@ -127,15 +130,18 @@ class QQChannel(Channel):
                 return
 
             raw = _strip_at_segments(event.raw_message, self._bot_uin)
-            text, img_urls = _extract_cq_images(raw)
+            text, _ = _extract_cq_images(raw)
 
-            if not text.strip() and not img_urls:
+            # 从 ncatbot 消息段提取图片
+            image_segs = event.message.filter_image() if hasattr(event.message, 'filter_image') else []
+
+            if not text.strip() and not image_segs:
                 return
 
             preview = text[:60] + "..." if len(text) > 60 else text
-            logger.info("[qq] 群聊消息  group=%s  user=%s  内容: %s  图片: %d", group_id, user_id, preview, len(img_urls))
+            logger.info("[qq] 群聊消息  group=%s  user=%s  内容: %s  图片: %d", group_id, user_id, preview, len(image_segs))
 
-            self._submit_to_main_loop(self._handle_group(group_id, user_id, text, img_urls))
+            self._submit_to_main_loop(self._handle_group(group_id, user_id, text, image_segs))
 
         @cast(Any, self._bot.on_startup())
         async def _(_event: Any) -> None:
@@ -196,14 +202,14 @@ class QQChannel(Channel):
     # ── 入站处理（主 loop） ─────────────────────────────────────────
 
     async def _handle_private(
-        self, user_id: str, text: str, img_urls: list[str]
+        self, user_id: str, text: str, image_segs: list
     ) -> None:
         """私聊入站处理"""
         session_key = f"qq:{user_id}"
 
         media_paths: list[str] = []
-        if img_urls:
-            media_paths = await self._download_images(img_urls, f"qq_{user_id}")
+        if image_segs:
+            media_paths = await self._download_image_segs(image_segs, f"qq_{user_id}")
             if media_paths:
                 logger.info("[qq] 下载了 %d 张图片用于分析", len(media_paths))
 
@@ -228,15 +234,15 @@ class QQChannel(Channel):
                 logger.error("[qq] 图片发送失败: %s", e)
 
     async def _handle_group(
-        self, group_id: str, user_id: str, text: str, img_urls: list[str]
+        self, group_id: str, user_id: str, text: str, image_segs: list
     ) -> None:
         """群聊入站处理"""
         chat_id = f"{_GROUP_PREFIX}{group_id}"
         session_key = f"qq:{chat_id}"
 
         media_paths: list[str] = []
-        if img_urls:
-            media_paths = await self._download_images(img_urls, f"qq_g{group_id}")
+        if image_segs:
+            media_paths = await self._download_image_segs(image_segs, f"qq_g{group_id}")
             if media_paths:
                 logger.info("[qq] 下载了 %d 张图片用于分析", len(media_paths))
 
@@ -350,11 +356,68 @@ class QQChannel(Channel):
 
     # ── 图片下载 ───────────────────────────────────────────────────
 
+    async def _download_image_segs(self, image_segs: list, prefix: str) -> list[str]:
+        """从 ncatbot Image 消息段下载图片到本地"""
+        import time
+
+        self._upload_dir.mkdir(parents=True, exist_ok=True)
+        paths: list[str] = []
+
+        for i, seg in enumerate(image_segs):
+            try:
+                ext = ".jpg"
+                if hasattr(seg, 'is_animated_image') and seg.is_animated_image():
+                    ext = ".gif"
+                filename = f"{prefix}_{int(time.time() * 1000)}_{i}{ext}"
+                save_path = self._upload_dir / filename
+
+                # download_to 是异步方法，需要在 bot loop 中调用
+                if hasattr(seg, 'download_to'):
+                    if self._bot_loop:
+                        import inspect
+                        if inspect.iscoroutinefunction(seg.download_to):
+                            # 异步方法，投递到 bot loop
+                            fut = asyncio.run_coroutine_threadsafe(
+                                seg.download_to(str(save_path)),
+                                self._bot_loop,
+                            )
+                            await asyncio.wrap_future(fut)
+                        else:
+                            # 同步方法
+                            await asyncio.to_thread(seg.download_to, str(save_path))
+                    else:
+                        await asyncio.to_thread(seg.download_to, str(save_path))
+                    paths.append(str(save_path))
+                    logger.debug("[qq] 图片下载成功(native): %s", save_path)
+                    continue
+
+                # 回退：用 url 属性 + httpx 下载
+                url = getattr(seg, 'url', None)
+                if url:
+                    downloaded = await self._download_images([url], prefix)
+                    paths.extend(downloaded)
+                else:
+                    logger.warning("[qq] 图片段无 url 也无 download_to: %s", type(seg))
+
+            except Exception as e:
+                url = getattr(seg, 'url', None)
+                if url:
+                    try:
+                        downloaded = await self._download_images([url], prefix)
+                        paths.extend(downloaded)
+                    except Exception as e2:
+                        logger.warning("[qq] 图片下载失败(url回退): %s", e2)
+                else:
+                    logger.warning("[qq] 图片下载失败: %s", e)
+
+        return paths
+
     async def _download_images(self, urls: list[str], prefix: str) -> list[str]:
-        """下载图片到本地，返回路径列表"""
+        """下载图片 URL 到本地，返回路径列表（httpx 回退方案）"""
         import httpx
         import time
 
+        self._upload_dir.mkdir(parents=True, exist_ok=True)
         paths: list[str] = []
         ext_map = {
             "image/jpeg": ".jpg",
