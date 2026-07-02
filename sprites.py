@@ -1,7 +1,7 @@
 """Pixel art cat sprite data — 16x16 frames, each char = color index."""
 
 SPRITE_SIZE = 16
-SCALE = 4  # displayed at 64x64
+SCALE = 8  # displayed at 128x128
 
 # Color palette (indexed by character)
 PALETTE = {

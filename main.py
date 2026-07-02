@@ -311,28 +311,76 @@ def _run_desktop(config_path: Path, workspace: Path) -> None:
     from PyQt6.QtWidgets import QApplication, QMessageBox
     from PyQt6.QtCore import Qt, QTimer
 
-    _lock_path = ROOT / ".pet-lock"
+    _mutex_handle = None
+    _MUTEX_NAME = "Global\\TomatoCatDesktopPet"
 
     def _acquire_lock():
-        if _lock_path.exists():
-            try:
-                old_pid = int(_lock_path.read_text().strip())
-                import ctypes
-                kernel32 = ctypes.windll.kernel32
-                handle = kernel32.OpenProcess(0x0400, False, old_pid)
-                if handle:
-                    kernel32.CloseHandle(handle)
-                    return False
-            except:
-                pass
-        _lock_path.write_text(str(os.getpid()))
-        return True
+        nonlocal _mutex_handle
+        if sys.platform != "win32":
+            _lock_path = ROOT / ".pet-lock"
+            if _lock_path.exists():
+                try:
+                    old_pid = int(_lock_path.read_text().strip())
+                    import ctypes
+                    kernel32 = ctypes.windll.kernel32
+                    handle = kernel32.OpenProcess(0x0400, False, old_pid)
+                    if handle:
+                        kernel32.CloseHandle(handle)
+                        return False
+                except:
+                    pass
+            _lock_path.write_text(str(os.getpid()))
+            return True
+
+        import ctypes
+        from ctypes import wintypes
+
+        kernel32 = ctypes.windll.kernel32
+        CreateMutexW = kernel32.CreateMutexW
+        CreateMutexW.argtypes = [wintypes.LPCVOID, wintypes.BOOL, wintypes.LPCWSTR]
+        CreateMutexW.restype = wintypes.HANDLE
+
+        WaitForSingleObject = kernel32.WaitForSingleObject
+        WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+        WaitForSingleObject.restype = wintypes.DWORD
+
+        handle = CreateMutexW(None, False, _MUTEX_NAME)
+        if not handle:
+            return False
+
+        WAIT_OBJECT_0 = 0
+        WAIT_TIMEOUT = 0x102
+        result = WaitForSingleObject(handle, 0)
+
+        if result == WAIT_OBJECT_0:
+            _mutex_handle = handle
+            return True
+        else:
+            kernel32.CloseHandle(handle)
+            return False
 
     def _release_lock():
-        try:
-            _lock_path.unlink()
-        except:
-            pass
+        nonlocal _mutex_handle
+        if sys.platform != "win32":
+            _lock_path = ROOT / ".pet-lock"
+            try:
+                _lock_path.unlink()
+            except:
+                pass
+            return
+
+        if _mutex_handle:
+            import ctypes
+            kernel32 = ctypes.windll.kernel32
+            try:
+                kernel32.ReleaseMutex(_mutex_handle)
+            except:
+                pass
+            try:
+                kernel32.CloseHandle(_mutex_handle)
+            except:
+                pass
+            _mutex_handle = None
 
     QApplication.setHighDpiScaleFactorRoundingPolicy(
         Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
