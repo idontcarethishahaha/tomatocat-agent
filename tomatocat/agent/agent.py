@@ -24,23 +24,146 @@ except ImportError:
     ZoneInfo = None
 
 
+_VL_MAX_FILE_BYTES = 20 * 1024 * 1024
+_VL_MAX_DATA_URI_BYTES = 8 * 1024 * 1024
+_VL_MAX_EDGE = 4096
+
+
+def _detect_image_mime_from_header(head: bytes) -> str | None:
+    """从文件头检测图片格式，比依赖扩展名更可靠。"""
+    if head.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if head.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if head.startswith((b"GIF87a", b"GIF89a")):
+        return "image/gif"
+    if head.startswith(b"BM"):
+        return "image/bmp"
+    if head.startswith(b"RIFF") and head[8:12] == b"WEBP":
+        return "image/webp"
+    return None
+
+
 def _encode_image_base64(image_path: str | Path) -> dict[str, Any] | None:
-    """将本地图片转为 OpenAI 兼容的 image_url 格式（base64 data URL）。"""
+    """将本地图片转为 OpenAI 兼容的 image_url 格式（base64 data URL）。
+
+    参考 tomatocat 的 vision.py，通过文件头检测格式，支持图片验证、缩放和压缩。
+    """
     p = Path(image_path)
     if not p.is_file():
+        logger.warning("[agent] 图片文件不存在: %s", p)
         return None
-    mime, _ = mimetypes.guess_type(p.name)
-    if not mime or not mime.startswith("image/"):
+
+    file_size = p.stat().st_size
+    if file_size > _VL_MAX_FILE_BYTES:
+        logger.warning(
+            "[agent] 图片文件过大（%dMB），上限为 %dMB",
+            file_size // (1024 * 1024),
+            _VL_MAX_FILE_BYTES // (1024 * 1024),
+        )
         return None
+
+    raw = p.read_bytes()
+    mime = _detect_image_mime_from_header(raw[:4096])
+    if not mime:
+        logger.warning("[agent] 无法识别的图片格式: %s", p.name)
+        return None
+
     try:
-        b64 = base64.b64encode(p.read_bytes()).decode("ascii")
+        from PIL import Image, ImageOps
+    except ModuleNotFoundError:
+        if mime not in ("image/jpeg", "image/png"):
+            logger.warning(
+                "[agent] 未安装 Pillow，不支持 %s 格式（仅支持 JPG/PNG），跳过: %s",
+                mime,
+                p.name,
+            )
+            return None
+        try:
+            b64 = base64.b64encode(raw).decode("ascii")
+            if len(b64) <= _VL_MAX_DATA_URI_BYTES:
+                logger.debug("[agent] 图片编码成功(无Pillow)，大小 %dKB", len(b64) // 1024)
+                return {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:{mime};base64,{b64}"},
+                }
+            else:
+                logger.warning("[agent] 图片编码后过大，需要 Pillow 进行压缩")
+                return None
+        except Exception as e:
+            logger.warning("[agent] 图片编码失败 %s: %s", p.name, e)
+            return None
+
+    try:
+        with Image.open(p) as img:
+            img.verify()
     except Exception as e:
-        logger.warning("[agent] 图片编码失败 %s: %s", p.name, e)
+        logger.warning("[agent] 图片文件损坏或无法解码: %s", e)
         return None
-    return {
-        "type": "image_url",
-        "image_url": {"url": f"data:{mime};base64,{b64}"},
-    }
+
+    try:
+        with Image.open(p) as img:
+            img = ImageOps.exif_transpose(img)
+            if img.mode not in ("RGB", "L"):
+                canvas = Image.new("RGB", img.size, (255, 255, 255))
+                alpha = img.getchannel("A") if "A" in img.getbands() else None
+                canvas.paste(img.convert("RGB"), mask=alpha)
+                img = canvas
+            elif img.mode == "L":
+                img = img.convert("RGB")
+
+            raw_b64_len = len(base64.b64encode(raw).decode())
+            if max(img.size) > _VL_MAX_EDGE or raw_b64_len > _VL_MAX_DATA_URI_BYTES:
+                img.thumbnail((_VL_MAX_EDGE, _VL_MAX_EDGE))
+
+            if raw_b64_len <= _VL_MAX_DATA_URI_BYTES and max(img.size) <= _VL_MAX_EDGE:
+                import io
+
+                buf = io.BytesIO()
+                if mime == "image/jpeg":
+                    img.save(buf, format="JPEG", quality=95, optimize=True)
+                    clean_mime = "image/jpeg"
+                else:
+                    img.save(buf, format="PNG", optimize=True)
+                    clean_mime = "image/png"
+                clean_b64 = base64.b64encode(buf.getvalue()).decode()
+                if len(clean_b64) <= _VL_MAX_DATA_URI_BYTES:
+                    logger.debug("[agent] 图片编码成功，大小 %dKB", len(clean_b64) // 1024)
+                    return {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:{clean_mime};base64,{clean_b64}", "detail": "high"},
+                    }
+
+            import io
+
+            best: bytes | None = None
+            for quality in (85, 75, 65, 55, 45):
+                buf = io.BytesIO()
+                img.save(buf, format="JPEG", quality=quality, optimize=True)
+                candidate = buf.getvalue()
+                candidate_b64 = base64.b64encode(candidate).decode()
+                best = candidate
+                if len(candidate_b64) <= _VL_MAX_DATA_URI_BYTES:
+                    logger.debug("[agent] 图片压缩成功，质量 %d，大小 %dKB", quality, len(candidate_b64) // 1024)
+                    return {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/jpeg;base64,{candidate_b64}", "detail": "high"},
+                    }
+
+            if best is None:
+                logger.warning("[agent] 图片压缩失败")
+                return None
+            best_b64 = base64.b64encode(best).decode()
+            logger.warning(
+                "[agent] 图片压缩后仍然过大（%dMB base64），上限为 %dMB",
+                len(best_b64) // (1024 * 1024),
+                _VL_MAX_DATA_URI_BYTES // (1024 * 1024),
+            )
+            return None
+
+    except Exception as e:
+        logger.warning("[agent] 图片处理失败 %s: %s", p.name, e)
+        return None
 
 
 def _weekday_cn(dt: datetime) -> str:
@@ -217,6 +340,9 @@ class TomatoCatAgent:
                 img = _encode_image_base64(p)
                 if img:
                     image_contents.append(img)
+                    logger.debug(f"[agent] 图片编码成功: {p}")
+                else:
+                    logger.warning(f"[agent] 图片编码失败: {p}")
             if image_contents:
                 logger.info("[agent] 收到 %d 张图片，启用视觉分析", len(image_contents))
 

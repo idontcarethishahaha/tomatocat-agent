@@ -1,0 +1,354 @@
+{
+  "timestamp": 1782956808.7655303,
+  "papers": [
+    {
+      "id": "http://arxiv.org/abs/2607.01087v1",
+      "title": "Cheap Code, Costly Judgment: A Case Study on Governable Agentic Software Engineering",
+      "summary": "Generative AI is shifting software engineering from a practice organized around scarce implementation effort toward one organized around abundant, low-cost code production. This shift changes the central engineering problem: not whether AI can generate useful code, but how engineers organize architectures, tools, evidence, and feedback loops so that AI-mediated development remains inspectable, correctable, and maintainable.   We study this problem through a first-person case study: a 12-week development effort in which a single expert software engineer used frontier AI coding agents to build a document accessibility remediation system. The empirical record comprises 88 contemporaneous field notes, 420 KLOC of production code, and 1.16 MLOC of tests, lints, supporting documentation, and agent tooling. From this record, we develop a candidate middle-range theory of governance conversion, expressed as a process model explaining how high-velocity agentic implementation becomes governable. The model explains how agentic implementation velocity surfaces recurring structural failure classes, and how engineering judgment sustains velocity by converting those failures into durable governance mechanisms. In contrast to existing governance models that derive controls from known obligations, governance conversion explains how controls are discovered from failures that become visible only during agentic work. We use our model to make testable predictions and to describe implications for software engineering research and practice.",
+      "published": "2026-07-01T15:44:15Z",
+      "authors": [
+        "James C. Davis",
+        "Paschal C. Amusuo",
+        "Tanmay Singla",
+        "Berk Çakar",
+        "Kirsten A. Davis"
+      ],
+      "categories": [
+        "cs.SE",
+        "cs.AI"
+      ],
+      "pdf_url": "https://arxiv.org/pdf/2607.01087v1",
+      "abs_url": "http://arxiv.org/abs/2607.01087v1"
+    },
+    {
+      "id": "http://arxiv.org/abs/2607.01084v1",
+      "title": "Can Agents Generalize to the Open World? Unveiling the Fragility of Static Training in Tool Use",
+      "summary": "While Large Language Model (LLM) agents demonstrate proficiency in static benchmarks, their deployment in real-world scenarios is hindered by the dynamic nature of user queries, tool sets, and interaction dynamics. To address this generalization gap, we formalize OpenAgent (Tool-Use Agent in Open-World), a problem setting characterized by distributional shifts across query, action, observation, and domain dimensions. To systematically diagnose its impact, we construct a controlled sandbox environment where we define fine-grained environmental shifts across a four-tier hierarchy, Perception, Interaction, Reasoning, and Internalization, and conduct a comprehensive series of experiments. Our analysis yields a series of key insights, demonstrating that agents trained via both Supervised Fine-Tuning(SFT) and Reinforcement Learning suffer from varying degrees of performance degradation when confronting open environmental shifts. Building on these insights, we propose Perturbation-Augmented Fine-Tuning, a disturbance-based intervention strategy for SFT that lays the foundation for enhancing agent robustness and utility in realistic environments. Our code will be released at: https://github. com/LAMDA-NeSy/OpenAgent.",
+      "published": "2026-07-01T15:40:25Z",
+      "authors": [
+        "Song-Lin Lv",
+        "Weiming Wu",
+        "Rui Zhu",
+        "Zi-Jian Cheng",
+        "Lan-Zhe Guo"
+      ],
+      "categories": [
+        "cs.AI"
+      ],
+      "pdf_url": "https://arxiv.org/pdf/2607.01084v1",
+      "abs_url": "http://arxiv.org/abs/2607.01084v1"
+    },
+    {
+      "id": "http://arxiv.org/abs/2607.01077v1",
+      "title": "Message Passing Enables Efficient Reasoning",
+      "summary": "While inference-time scaling has improved the reasoning abilities of large language models (LLMs), the need to generate long chains-of-thought (CoTs) is a computational bottleneck. Thus, in contrast to sequential scaling methods like CoT, recent parallel scaling techniques instead use fork and join (FJ) primitives to divide work across multiple LLM threads. However, in the fork-join paradigm, threads are typically transient and do not communicate pointwise with one another which limits scalability. To tackle this, we introduce Message Passing Language Models (MPLMs), a framework for LLM reasoning in which threads communicate directly via lightweight send and receive primitives. MPLMs enable efficient scaling through two key mechanisms: (1) reduced communication costs, achieved by avoiding redundant context sharing, and (2) preemption, which allows threads to terminate early based on partial information from their peers.   We demonstrate the promise of MPLMs on 3 classes of tasks. First, on Sudoku puzzles, we show that MPLMs require an asymptotically smaller context than both serial CoT and parallel FJ. We then fine-tune a single model to solve 25 x 25 puzzles that remain challenging for standard CoT and FJ approaches, as well as frontier reasoning models without tools. Second, on 3-SAT puzzles, the capability of preemption allows termination of unpromising branches, which results in improved efficiency. Finally, we show that appropriately prompted large pre-trained models follow the MPLM protocol, achieving competitive results on long-context question answering relative to popular fork-join approaches.",
+      "published": "2026-07-01T15:35:04Z",
+      "authors": [
+        "Xuecheng Liu",
+        "Daman Arora",
+        "Gokul Swamy",
+        "Andrea Zanette"
+      ],
+      "categories": [
+        "cs.CL",
+        "cs.LG"
+      ],
+      "pdf_url": "https://arxiv.org/pdf/2607.01077v1",
+      "abs_url": "http://arxiv.org/abs/2607.01077v1"
+    },
+    {
+      "id": "http://arxiv.org/abs/2607.01071v1",
+      "title": "MemSyco-Bench: Benchmarking Sycophancy in Agent Memory",
+      "summary": "Memory has emerged as a cornerstone of modern LLM-based agents, supporting their evolution from single-turn assistants to long-term collaborators. However, memory is not always beneficial: retrieved memories often induce a critical issue of sycophancy, causing agents to over-align with the user at the cost of factual accuracy or objective reasoning. Despite this emerging risk, existing memory benchmarks primarily evaluate whether memories are correctly stored, retrieved, or updated, while overlooking how retrieved memories influence downstream reasoning and decision-making. To bridge this gap, we propose MemSyco-Bench, a comprehensive benchmark for evaluating memory-induced sycophancy in agent systems. MemSyco-Bench measures when memory should influence a decision and how valid memory should be used. Specifically, it covers five tasks that assess whether agents can reject memory as factual evidence, respect its applicable scope, resolve conflicts between memory and objective evidence, track memory updates, and use valid memory for personalization. All related resources are collected for the community at https://github.com/XMUDeepLIT/MemSyco-Bench.",
+      "published": "2026-07-01T15:30:33Z",
+      "authors": [
+        "Zhishang Xiang",
+        "Zerui Chen",
+        "Yunbo Tang",
+        "Zhimin Wei",
+        "Ruqin Ning"
+      ],
+      "categories": [
+        "cs.IR",
+        "cs.AI"
+      ],
+      "pdf_url": "https://arxiv.org/pdf/2607.01071v1",
+      "abs_url": "http://arxiv.org/abs/2607.01071v1"
+    },
+    {
+      "id": "http://arxiv.org/abs/2607.01065v1",
+      "title": "GSRQ: Gain-Shape Residual Quantization for Sub-1-bit KV Cache",
+      "summary": "The deployment of Large Language Models (LLMs) with extended context windows is increasingly constrained by the linear growth of Key-Value (KV) cache memory. Vector Quantization (VQ), particularly Residual Quantization (RQ), is a promising approach for pushing KV cache storage toward the sub-1-bit regime by progressively encoding residuals with small codebooks. However, most VQ methods still rely on standard $\\ell_2$ $K$-means as the core codebook-learning primitive. We identify a subtle high-dimensional issue of this primitive: Euclidean centroid averaging can induce centroid shrinkage, which weakens the angular alignment term in the $\\ell_2$ distortion and makes directional preservation harder. To address this issue, we propose Gain-Shape $K$-means (GSKM), a drop-in replacement for $K$-means that improves directional fidelity while matching, and in some regimes improving, $\\ell_2$ distortion. We then build Gain-Shape Residual Quantization (GSRQ) by incorporating a weighted extension of GSKM into an RQ pipeline. On LLaMA-3-8B, GSRQ substantially improves over strong KV cache quantization baselines across bit rates. At 1-bit, it improves the average accuracy across LongBench tasks from 11.34 to 33.54, a gain of 22.20 percentage points over VQLLM.",
+      "published": "2026-07-01T15:25:21Z",
+      "authors": [
+        "Soosung Kim",
+        "Minjae Park",
+        "Eui-Young Chung",
+        "Jaeyong Chung"
+      ],
+      "categories": [
+        "cs.LG"
+      ],
+      "pdf_url": "https://arxiv.org/pdf/2607.01065v1",
+      "abs_url": "http://arxiv.org/abs/2607.01065v1"
+    },
+    {
+      "id": "http://arxiv.org/abs/2607.01061v1",
+      "title": "Agentic generation of verifiable rules for deterministic, self-expanding reaction classification",
+      "summary": "Computer-assisted synthesis planning breaks target molecules into accessible precursors using large libraries of reaction rules that assign each transformation a deterministic, interpretable label. But chemistry is long-tailed, making manual encoding intractable, and existing tools rely on fixed rulesets that cannot adapt to new chemistries. Here we present a fully automated pipeline in which a multi-agent framework of large language models (LLMs) classifies reactions and writes the rules themselves across 665,901 US patent reactions, generating each rule under a verification loop that tests it against the corpus. It expands a standard taxonomy from 68 to 14,073 classes without human curation. With a lightweight fingerprint classifier, it classifies 97.7\\% of unseen reactions, matching a leading proprietary classifier while resolving chemistry more finely and extending on demand to chemistry outside its training distribution. The result is a living reactivity database and a general route to turning generative models into reliable, self-expanding symbolic systems.",
+      "published": "2026-07-01T15:24:06Z",
+      "authors": [
+        "Daniel Armstrong",
+        "Maarten Dobbelaere",
+        "Valentas Olikauskas",
+        "Helena Avila",
+        "Octavian Susanu"
+      ],
+      "categories": [
+        "cs.AI",
+        "cs.CL"
+      ],
+      "pdf_url": "https://arxiv.org/pdf/2607.01061v1",
+      "abs_url": "http://arxiv.org/abs/2607.01061v1"
+    },
+    {
+      "id": "http://arxiv.org/abs/2607.01047v1",
+      "title": "Conversable Complexity: Agentic LLM Collectives as Interpretable Substrates",
+      "summary": "Complexity and interpretability rarely coincide: systems rich enough for complex behaviours to emerge are usually too opaque to question, while transparent ones are too simple for anything complex to emerge. A single large language model (LLM) is a static artefact, hardly exhibiting any of the emergent properties we associate with life. This changes through interaction: populations of LLMs display emergent dynamics absent from isolated models. Furthermore, LLMs can be endowed with persistent memory, tools and shared skills, and the capacity to initiate actions unprompted, i.e., turning LLMs agentic. In this paper, we argue that such collectives of agents can serve as a computational substrate for Artificial Life (ALife) research. Critically, since the agents communicate in natural language, their collective behaviour can be directly interrogated by examining textual traces and asking the agents themselves. We outline the notion of interpretability in language-model research and extend it for collectives of agents. Lastly, we survey recent examples of agentic LLM collectives that already instantiate the idea of agentic substrates, from controlled experiments to deployments in the wild.",
+      "published": "2026-07-01T15:08:02Z",
+      "authors": [
+        "Elias Najarro",
+        "Ane Espeseth",
+        "Eleni Nisioti",
+        "Sebastian Risi",
+        "Stefano Nichele"
+      ],
+      "categories": [
+        "cs.CL"
+      ],
+      "pdf_url": "https://arxiv.org/pdf/2607.01047v1",
+      "abs_url": "http://arxiv.org/abs/2607.01047v1"
+    },
+    {
+      "id": "http://arxiv.org/abs/2607.01044v1",
+      "title": "Robots Ask the Way: Communication-Enabled Social Navigation",
+      "summary": "Assistive autonomous robots operating in multi-agent environments require efficient strategies to locate specific individuals among multiple residents. Current social navigation methods focus on reactive collision avoidance and trajectory adaptation, but lack mechanisms to proactively gather information through human-robot communication.   We introduce Communication-enabled Social Navigation (CommNav). In this novel task, robotic agents actively seek assistance from residents to locate target individuals by requesting information about recent sightings, locations, and movements.   To evaluate CommNav, we extend Habitat 3.0 to create Habitat 3.0c, a communication-enabled variant supporting multi-human environments with information exchange protocols. Adding our communication module (COMM) to a state-of-the-art social navigation model yields a 10 percentage-point improvement in Episode Success. We further investigate the transition from structured data to natural language by evaluating models trained on LLM-generated instructions and on colloquial instructions collected from a human study.   Our experiments reveal that: (i) explicit human-robot communication substantially enhances multi-person navigation performance; (ii) pre-training COMM on a communication pretext task effectively addresses the challenge of occasional interaction signals; and (iii) the navigation policy is highly robust to natural, colloquial human language, achieving an episode success statistically similar to the model using perfect structured data.",
+      "published": "2026-07-01T15:07:40Z",
+      "authors": [
+        "Valentino Sacco",
+        "Luca Scofano",
+        "Indro Spinelli",
+        "Fabio Galasso"
+      ],
+      "categories": [
+        "cs.RO"
+      ],
+      "pdf_url": "https://arxiv.org/pdf/2607.01044v1",
+      "abs_url": "http://arxiv.org/abs/2607.01044v1"
+    },
+    {
+      "id": "http://arxiv.org/abs/2607.01043v1",
+      "title": "DART-VLN: Test-Time Memory Decay and Anti-Loop Regularization for Discrete Vision-Language Navigation",
+      "summary": "Memory-based discrete vision-language navigation (VLN) agents must act under partial observability, yet even strong frozen backbones remain vulnerable at test time. Two common failure modes are stale historical evidence at memory readout and inefficient local backtracking during action selection. We present DART-VLN, a training-free test-time control framework for discrete VLN. DART-VLN combines Test-Time Memory Decay, a read-side memory reweighting rule that suppresses stale and redundant evidence without rewriting stored content, with Anti-Loop Regularization, a lightweight next-hop penalty that discourages immediate reversals during action selection. The framework introduces no new learnable parameters and leaves the learned backbone unchanged. Experiments on R2R and REVERIE show a consistent pattern: decay-only provides stable read-side gains, while decay+anti-loop achieves the best overall quality-efficiency trade-off, yielding shorter trajectories, lower runtime, and improved navigation performance in key settings. Behavioral analysis further confirms that anti-loop regularization reduces local backtracking and improves path efficiency under frozen backbones. Overall, the results show that modest test-time control can make memory-based discrete VLN more reliable and efficient without retraining.",
+      "published": "2026-07-01T15:07:07Z",
+      "authors": [
+        "Shaoheng Zhang",
+        "Zhichen Li",
+        "Jie Mei"
+      ],
+      "categories": [
+        "cs.RO",
+        "cs.AI"
+      ],
+      "pdf_url": "https://arxiv.org/pdf/2607.01043v1",
+      "abs_url": "http://arxiv.org/abs/2607.01043v1"
+    },
+    {
+      "id": "http://arxiv.org/abs/2607.01034v1",
+      "title": "Behavior-Adaptive Conversational Agents: Toward a Fluid Personality Framework",
+      "summary": "Large language model (LLM)-based conversational agents (CAs) are now ubiquitous, creating new opportunities for AI-mediated behavior change. Their capacity to project nuanced personalities and adopt diverse metaphorical roles raises a design question: how should an agent's persona and personality be calibrated to the moment? Recent evidence suggests that (i) moderate personality expression outperforms low or high extremes on trust, enjoyment, and intention to adopt in goal-oriented tasks, and (ii) context-appropriate metaphors outperform static one-note assistants on user experience and uptake. Yet most CAs still fix both persona and style, risking misalignment when dynamics, urgency, and formality vary, for example in medical information seeking, fitness coaching, and reflective learning. We propose a Fluid Personality Framework that jointly adapts (1) the agent's metaphorical persona, such as coach, tutor, librarian, or tool, and (2) its personality expression intensity, low, medium, or high, as a function of task context, user goals and traits, and situational urgency. We sketch the framework and its core design dimensions.",
+      "published": "2026-07-01T15:03:59Z",
+      "authors": [
+        "Hasibur Rahman",
+        "Smit Desai"
+      ],
+      "categories": [
+        "cs.CL",
+        "cs.AI",
+        "cs.HC"
+      ],
+      "pdf_url": "https://arxiv.org/pdf/2607.01034v1",
+      "abs_url": "http://arxiv.org/abs/2607.01034v1"
+    },
+    {
+      "id": "http://arxiv.org/abs/2607.01006v1",
+      "title": "Understanding Large Language Models",
+      "summary": "Large Language Models (LLMs) represent one of the most significant advances in AI and natural language processing in recent years. Still, many pressing questions about their mechanisms, capabilities, and relationship to human cognition remain highly debated. This chapter aims to outline our current understanding of LLMs by discussing recent evidence on emerging capabilities and their mechanistic implementation within processing layers. We begin with a concise overview of the Transformer architecture, emphasizing how the attention mechanism enables training on massive datasets, allowing LLMs to function as generalist rather than specialized models. Next, we examine emergent LLM capabilities that appear to resemble aspects of human cognition, including symbolic reasoning, theory of mind, and deception strategies. Several studies provide evidence that LLMs can solve tasks previously thought to require human-like cognition. Other studies reveal insightful failure cases that shed light on the differences between human and LLM cognition. Alongside these findings, we review explainable AI approaches ranging from neuron activation analysis to circuit tracing. In the final section, we address current debates concerning what LLMs genuinely understand versus what they merely appear to understand. Prominent arguments against AI anthropomorphism point to the simplicity of LLM training objectives, claiming that LLM behavior is better explained by pattern memorization of training data than by genuine cognition. We argue that this standpoint is guided by misconceptions about optimization processes and cognitive capacity, and advocate for a more nuanced discussion of LLM cognition that neither dismisses the differences between humans and LLMs nor precludes the possibility of AI cognition through overly simplistic reductionist arguments.",
+      "published": "2026-07-01T14:45:18Z",
+      "authors": [
+        "Yannik Keller",
+        "Thomas Eisenmann"
+      ],
+      "categories": [
+        "cs.CL"
+      ],
+      "pdf_url": "https://arxiv.org/pdf/2607.01006v1",
+      "abs_url": "http://arxiv.org/abs/2607.01006v1"
+    },
+    {
+      "id": "http://arxiv.org/abs/2607.01002v1",
+      "title": "Logit-Contribution Scoring Identifies Non-Literal Retrieval Heads",
+      "summary": "In long-context use, large language models frequently synthesize answers from the meaning of a relevant context span rather than literally copy-pasting them. Identifying which attention heads perform this synthesis matters for interpreting long-context model behavior. Yet existing detectors miss these heads by construction: they reward heads whose attended token matches the generated token, a literal-copy criterion that captures where a head reads but not what it writes through its output-value (OV) circuit, the very mechanism that carries non-literal retrieval. We introduce Logit-Contribution Scoring (LOCOS), a write-aware detector that scores each head by the projection of its OV-circuit output onto the answer-token unembedding direction, contrasting needle and off-needle source positions in a single forward pass. Across three model families (Qwen3, Gemma-3, OLMo-3.1), mean-ablating the top LOCOS heads on the NoLiMa non-literal retrieval benchmark collapses ROUGE-L at lower head counts than prior attention-based detections; on Qwen3-8B, ablating 50 heads drives ROUGE-L from 0.401 to 0.000 while the strongest baseline still retains 0.292. The selected heads are retrieval-specific: parametric recall and arithmetic reasoning stay at baseline under the same ablation. On Qwen3-8B, the same ablation also drops MuSiQue from 0.55 to 0.08 and BABI-Long from 0.62 to 0.20, while a random-heads control stays within 0.05 of baseline.",
+      "published": "2026-07-01T14:41:07Z",
+      "authors": [
+        "Aryo Pradipta Gema",
+        "Beatrice Alex",
+        "Pasquale Minervini"
+      ],
+      "categories": [
+        "cs.CL",
+        "cs.AI",
+        "cs.LG"
+      ],
+      "pdf_url": "https://arxiv.org/pdf/2607.01002v1",
+      "abs_url": "http://arxiv.org/abs/2607.01002v1"
+    },
+    {
+      "id": "http://arxiv.org/abs/2607.00990v1",
+      "title": "SWE-Doctor: Guiding Software Engineering Agents with Runtime Diagnosis from Multi-Faceted Bug Reproduction Tests",
+      "summary": "Large language model (LLM)-based software engineering agents are increasingly developed to resolve software issues by generating patches from issue reports and code repositories. Bug reproduction tests (BRTs) are an important building block for such agents and have been shown useful for patch validation. However, it remains unclear whether BRTs can also help the more central stage of patch generation. We first conduct a preliminary study and find that directly using advanced BRT generators to guide patch generation is not beneficial: fail-to-fail BRTs can mislead agents, while even fail-to-pass BRTs bring limited or negative gains. Our analysis reveals two reasons: fail-to-pass BRTs may cover only one manifestation of the reported issue, leading to partial patches, whereas fail-to-fail BRTs are unreliable as direct patch-generation targets. Motivated by these insights, we propose SWE-Doctor, a software issue resolution agent that guides patch generation with runtime diagnoses derived from multi-faceted BRT executions. SWE-Doctor first generates multi-faceted BRTs for different behavioral requirements stated in the issue, then executes and debugs these BRTs to construct runtime-grounded diagnosis records, and finally uses the diagnoses together with localization information inferred during BRT generation to guide patch generation and reduce partial patches. We evaluate SWE-Doctor on Python bug-fixing issues from the widely adopted SWE-bench Verified and SWE-bench Pro across five LLM backends. SWE-Doctor consistently outperforms existing agents across all 10 LLM-benchmark combinations, achieving average resolution rates of 75.7% on SWE-bench Verified and 59.4% on SWE-bench Pro. In particular, on the more challenging SWE-bench Pro, SWE-Doctor improves the average resolution rate by 8.0-8.9 percentage points over the baseline agents.",
+      "published": "2026-07-01T14:27:12Z",
+      "authors": [
+        "Yaoqi Guo",
+        "Yang Liu",
+        "Jie M. Zhang",
+        "Yun Ma",
+        "Yiling Lou"
+      ],
+      "categories": [
+        "cs.SE",
+        "cs.AI"
+      ],
+      "pdf_url": "https://arxiv.org/pdf/2607.00990v1",
+      "abs_url": "http://arxiv.org/abs/2607.00990v1"
+    },
+    {
+      "id": "http://arxiv.org/abs/2607.00989v1",
+      "title": "SenseWalk: Agent-Based Semantic Trajectory Simulation Powered by Large Language Models in Zoned Environments",
+      "summary": "Semantic trajectory analysis has recently emerged as an approach for modeling human movement by capturing implicit patterns and behaviors through semantic information (e.g., visitors' profiles and goals) beyond raw spatial paths to better understand why people move in certain ways. However, analyzing semantic trajectories in real-world scenarios remains challenging, as collecting high-quality data is costly and often lacks rich semantic information. Meanwhile, existing simulation tools require substantial technical expertise, which makes them difficult for practitioners to adopt. To address these limitations, the paper proposes ${SenseWalk}$, an interactive system that supports simulating semantic trajectories by LLM-powered agents. We develop a simulation workflow that combines LLMs and the social force model to balance physical plausibility and semantic coherence. A user-friendly interface is designed to facilitate users in customizing the simulation configuration and analyzing simulation outputs. We also conduct a quantitative experiment to evaluate the effectiveness of our simulation workflow, and a user study (n=12) to assess the usefulness and efficiency of our system.",
+      "published": "2026-07-01T14:25:47Z",
+      "authors": [
+        "Ziyue Lin",
+        "Xinhang Xie",
+        "Kangyi Wang",
+        "Siming Chen"
+      ],
+      "categories": [
+        "cs.HC",
+        "cs.AI"
+      ],
+      "pdf_url": "https://arxiv.org/pdf/2607.00989v1",
+      "abs_url": "http://arxiv.org/abs/2607.00989v1"
+    },
+    {
+      "id": "http://arxiv.org/abs/2607.00972v1",
+      "title": "Bayesian Uncertainty Propagation for Agentic RAG Pipelines: A Proof-of-Concept Study on Multi-Hop Question Answering",
+      "summary": "Trustworthy deployment of Agentic Retrieval-Augmented Generation (RAG) systems requires mechanisms for estimating when multi-stage reasoning pipelines may fail. This paper presents an uncertainty-aware Agentic Retrieval-Augmented Generation (RAG) framework in which planner, evaluator and generator stages produce uncertainty signals derived from semantic divergence and generator self-evaluation. These signals are propagated through a Bayesian Network (BN) to estimate system-level uncertainty and provide node-level indicators of potential failure points across the workflow. The approach is evaluated on StrategyQA and HotpotQA using GPT-3.5-Turbo and GPT-4.1-Nano, with Area Under the Receiver Operating Characteristic Curve (AUROC), Area Under the Accuracy-Rejection Curve (AUARC), Expected Calibration Error (ECE), and Brier Score used to assess discrimination, selective prediction and calibration. Results show that Bayesian propagation is more effective on HotpotQA, where uncertainty accumulates across multi-hop reasoning stages, while StrategyQA exposes limitations caused by miscalibration and unreliable upstream signals. The study positions Bayesian uncertainty propagation as a promising but preliminary mechanism for monitoring Agentic RAG systems, with future validation required in industrial domains such as Offshore Wind (OSW) maintenance decision support.",
+      "published": "2026-07-01T14:08:58Z",
+      "authors": [
+        "Louis Donaldson",
+        "Connor Walker",
+        "Koorosh Aslansefat",
+        "Yiannis Papadopoulos"
+      ],
+      "categories": [
+        "cs.AI"
+      ],
+      "pdf_url": "https://arxiv.org/pdf/2607.00972v1",
+      "abs_url": "http://arxiv.org/abs/2607.00972v1"
+    },
+    {
+      "id": "http://arxiv.org/abs/2607.00970v1",
+      "title": "Svarna: An Open Corpus Workbench for Modern Greek",
+      "summary": "This paper introduces Svarna, a free, open-source, web-based corpus workbench for modern Greek. Svarna integrates five databases covering various registers, institutional, literary, dialectal, social media, and historical, to provide a total of more than 507 million words and around 29 million sentences. This platform addresses the chronic gaps in Greek language technology. Although various corpus resources exist, they are scattered across different platforms, and in many cases, institutional access is restricted or they are no longer available online. Svarna integrates these resources into a single interface that can be used without logging in, installation, or specialized training. This system provides a concordancer with KWIC marking capabilities, frequency analysis including register-by-register normalization, collocation extraction using mutual information, a dictionary of 93 Greek discourse markers providing distribution profiles, text-level analysis tools including n-grams, variants, and collocation networks, register comparison using log-ratio, regular expression search, and an optional LLM layer for pragmatic annotation and free research mode. This platform is built upon SQLite FTS5 full-text indexes provided via a FastAPI backend, deployed as Docker containers on Azure, and released under the MIT license. Source code, build scripts, and deployment configurations are publicly available on GitHub. Users can add their own corpora and deploy their own instances. This document describes the system design, corpus structure, and use cases demonstrating the various queries supported by the platform. Svarna serves as the first step in exploring available data and is expected to lay the foundation for more comprehensive research in the future.",
+      "published": "2026-07-01T14:05:02Z",
+      "authors": [
+        "Stergios Chatzikyriakidis"
+      ],
+      "categories": [
+        "cs.CL"
+      ],
+      "pdf_url": "https://arxiv.org/pdf/2607.00970v1",
+      "abs_url": "http://arxiv.org/abs/2607.00970v1"
+    },
+    {
+      "id": "http://arxiv.org/abs/2607.00968v1",
+      "title": "Quantifying the Affective Gap: A Zero-Shot Evaluation of LLMs on Fine-Grained Emotion Taxonomies",
+      "summary": "Emotion recognition in natural language is a foundational challenge in affective computing, with critical implications for human-computer interaction, mental health support, and conversational AI. This paper presents a rigorous, unified zero-shot evaluation of three leading commercial large language models: Claude (claude-sonnet-4-6), ChatGPT (GPT-5.4), and Gemini (gemini-2.5-flash). The models were queried through their respective production APIs as of April 2026 on a fine-grained 13-class emotion classification task. Using a stratified 1,000-sentence sample from the boltuix/emotions dataset, which comprises 131,306 sentences across 13 categories, a single uniform prompt with no exemplars was applied identically across all models. Gemini achieves the highest accuracy (39.9%) and macro-F1 score (0.363), followed by GPT-5.4 (38.8%, macro-F1 = 0.291) and Claude (38.0%, macro-F1 = 0.159). All models excel on sarcasm and desire while consistently failing on love, confusion, and shame. McNemar tests reveal no statistically significant pairwise differences (p > 0.10), suggesting convergence at a shared zero-shot ceiling. Claude's markedly lower macro-F1 score exposes a class-imbalance prediction bias. These findings highlight the current limitations of frontier AI systems in zero-shot fine-grained emotion classification.",
+      "published": "2026-07-01T14:04:48Z",
+      "authors": [
+        "Lawrence Obiuwevwi",
+        "Krzysztof J. Rechowicz",
+        "Jessica M. Johnson",
+        "Vikas Ashok",
+        "Sachin Shetty"
+      ],
+      "categories": [
+        "cs.CL",
+        "cs.HC"
+      ],
+      "pdf_url": "https://arxiv.org/pdf/2607.00968v1",
+      "abs_url": "http://arxiv.org/abs/2607.00968v1"
+    },
+    {
+      "id": "http://arxiv.org/abs/2607.00937v1",
+      "title": "Persona Non Grata: LLM Persona-Driven Generations in MCQA are Unstable in Distinct Dimensions",
+      "summary": "Persona-driven generations (PDGs) have seen prolific use in research and industry applications, where a large language model (LLM) takes on a 'persona' while completing some task. While persona expressed through free-form text (like dialogue) has substantial work investigating stability or consistency, relatively, persona expressed in non-text-heavy outputs (like in multiple-choice question answering, or MCQA) is often overlooked. We work to address this gap, seeking to understand the instability of LLM PDGs in MCQA tasks. We develop three metrics investigating the performance, outcome, and question correctness stability, evaluating three distinct dimensions. Using these metrics, we find that instability varies consistently between model families and model size, and across question domains, with math/commonsense questions leading to greater instability. We also find task prompt format introduces more prediction instability than other hyperparameters, like temperature. Finally, we find that instability is related to task accuracy, and using our instability metrics, find different experimental settings that result in different best and worst personas for tasks, despite their similarity. This reveals the importance of checking hyperparameter instability in PDGs.",
+      "published": "2026-07-01T13:40:25Z",
+      "authors": [
+        "César Guerra-Solano",
+        "Xiang Lorraine Li"
+      ],
+      "categories": [
+        "cs.CL"
+      ],
+      "pdf_url": "https://arxiv.org/pdf/2607.00937v1",
+      "abs_url": "http://arxiv.org/abs/2607.00937v1"
+    },
+    {
+      "id": "http://arxiv.org/abs/2607.00927v1",
+      "title": "Post-Training Pruning for Diffusion Transformers",
+      "summary": "Diffusion Transformers (DiTs) have demonstrated impressive performance in image generation but suffer from substantial computational overhead and resource consumption. Post-training pruning offers a promising solution; however, due to DiTs' unique architectural design and parameter distribution, traditional pruning methods are inapplicable, leading to significant performance degradation. Specifically, prior methods developed for LLMs, which derive metrics through a series of approximations, amplify the relative contribution of weights in the saliency metric. In addition, weights in DiTs exhibit significantly larger magnitudes than those in LLMs. Moreover, existing pruning granularity overlooks variations in model structures. In this paper, we propose DiT-Pruning, which improves pruning performance by introducing customized saliency criteria and pruning granularity. We design a novel metric that balances the contributions of weights and activations from an energy-based perspective, enabling more effective identification of important elements. Furthermore, we observe distinct clustering patterns in the two-dimensional weight space. Accordingly, we adopt a clustering-aware pruning granularity, enabling effective sparse allocation. Extensive evaluations on various DiTs show that our method consistently preserves image quality, especially under high sparsity. For FLUX.1-dev at 512x512 resolution on MJHQ, DiT-Pruning achieves only a 0.001 loss in CLIP score at 50% sparsity, dramatically outperforming recent pruning methods.",
+      "published": "2026-07-01T13:30:49Z",
+      "authors": [
+        "Chengzhi Hu",
+        "Xuewen Liu",
+        "Jing Zhang",
+        "Mengjuan Chen",
+        "Zhikai Li"
+      ],
+      "categories": [
+        "cs.CV",
+        "cs.AI"
+      ],
+      "pdf_url": "https://arxiv.org/pdf/2607.00927v1",
+      "abs_url": "http://arxiv.org/abs/2607.00927v1"
+    },
+    {
+      "id": "http://arxiv.org/abs/2607.00926v1",
+      "title": "Human-Machine Collaboration on Generative Meta-Learning: Model and Algorithm",
+      "summary": "Generalizing machine learning models to environments that differ from their training distribution remains a critical hurdle, particularly when data from the target domain is entirely or partially unavailable. We propose Generative Meta-Learning with Human Feedback (GMHF), a novel framework that bridges this domain gap by leveraging expert intuition to guide data synthesis. Grounded in a theoretical analysis of generalization error, we derive bounds demonstrating that aligning the distribution of generated data with human beliefs regarding the target physics significantly mitigates risk. GMHF operationalizes this insight by employing a Conditional Neural ODE (cNODE) as a generative digital twin, coupled with a Reinforcement Learning (RL) agent. The agent iteratively refines the latent physical parameters of the generated trajectories based on feedback, effectively steering the meta-learner toward the unobserved target distribution. Empirical validation on a nonlinear Duffing oscillator shows that GMHF substantially reduces deployment loss as expert reliability increases, and that the divergence between generated and target data falls under reliable feedback, directly corroborating the divergence-minimisation mechanism predicted by our theory. Further experiments on a non-dynamical probabilistic model confirm that the framework extends beyond ODE-governed systems, establishing human-AI collaboration as a rigorous catalyst for robust generalisation under distribution shift.",
+      "published": "2026-07-01T13:29:54Z",
+      "authors": [
+        "Midhun Parakkal Unni",
+        "Samuel Kaski"
+      ],
+      "categories": [
+        "cs.LG",
+        "cs.AI"
+      ],
+      "pdf_url": "https://arxiv.org/pdf/2607.00926v1",
+      "abs_url": "http://arxiv.org/abs/2607.00926v1"
+    }
+  ]
+}

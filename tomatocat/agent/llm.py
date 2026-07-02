@@ -43,14 +43,19 @@ class LLMProvider:
         enable_thinking: bool = False,
     ) -> None:
         self.model = model
-        self.api_key = api_key
+        self.api_key = api_key or "placeholder"
         self.base_url = base_url
         self.enable_thinking = enable_thinking
+        self._valid = bool(api_key and api_key.strip() and api_key != "placeholder")
 
-        client_kwargs: dict[str, Any] = {"api_key": api_key}
+        client_kwargs: dict[str, Any] = {"api_key": self.api_key}
         if base_url:
             client_kwargs["base_url"] = base_url
         self._client = AsyncOpenAI(**client_kwargs)
+
+    def _check_valid(self) -> None:
+        if not self._valid:
+            raise ValueError("LLM API key 未配置，请在 config.toml 中设置 llm.main.api_key")
 
     async def chat(
         self,
@@ -60,6 +65,7 @@ class LLMProvider:
         temperature: float = 0.7,
         on_delta: Callable[[_StreamDelta], Awaitable[None]] | None = None,
     ) -> LLMResponse:
+        self._check_valid()
         kwargs: dict[str, Any] = {
             "model": self.model,
             "messages": messages,
@@ -202,6 +208,7 @@ class LLMProvider:
         max_tokens: int = 2048,
         temperature: float = 0.7,
     ) -> str:
+        self._check_valid()
         messages = [{"role": "user", "content": prompt}]
         try:
             response = await self._client.chat.completions.create(

@@ -16,6 +16,8 @@ class EmbeddingService:
         self._cache: dict[str, np.ndarray] = {}
 
     async def embed(self, text: str) -> np.ndarray:
+        if not text or not text.strip():
+            return np.zeros(1024, dtype=np.float32)
         if text in self._cache:
             return self._cache[text]
 
