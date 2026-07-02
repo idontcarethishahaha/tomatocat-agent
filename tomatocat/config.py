@@ -45,7 +45,6 @@ class QQChannelConfig:
     bot_uin: str = ""
     allow_from: list[str] = field(default_factory=list)
     groups: list[str] = field(default_factory=list)
-    napcat_ws: str = "ws://localhost:3001"
 
 
 @dataclass
@@ -182,7 +181,6 @@ class Config:
                     bot_uin=channels_data.get("qq", {}).get("bot_uin", ""),
                     allow_from=channels_data.get("qq", {}).get("allow_from", []),
                     groups=channels_data.get("qq", {}).get("groups", []),
-                    napcat_ws=channels_data.get("qq", {}).get("napcat_ws", "ws://localhost:3001"),
                 ),
             ),
             memory=MemoryConfig(

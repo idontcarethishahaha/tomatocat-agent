@@ -49,6 +49,7 @@ class StatusCommandsPlugin(Plugin):
             "/status": self._cmd_status,
             "/version": self._cmd_version,
             "/help": self._cmd_help,
+            "/proactive_test": self._cmd_proactive_test,
         }
 
         handler = handlers.get(cmd)
@@ -104,12 +105,27 @@ class StatusCommandsPlugin(Plugin):
     def _cmd_version(self, **kw) -> str:
         return f"🍅🐱 番茄猫 TomatoCat v{_VERSION}\n基于 akashic-agent 架构学习实现"
 
+    def _cmd_proactive_test(self, **kw) -> str:
+        proactive = self.context.proactive
+        if not proactive:
+            return "😿 主动推送未启用！\n请检查 config.toml 中 proactive.enabled = true"
+
+        import asyncio
+        loop = asyncio.get_running_loop()
+
+        async def _run_test():
+            await proactive._tick()
+
+        loop.create_task(_run_test())
+        return "🚀 主动推送测试已触发！\n请查看日志和目标渠道是否收到推送消息~"
+
     def _cmd_help(self, **kw) -> str:
         return (
             "🍅🐱 番茄猫命令列表：\n"
             "/ping - 检查存活，显示运行时长\n"
             "/status - 查看系统状态（插件/会话/记忆）\n"
             "/version - 查看版本号\n"
+            "/proactive_test - 测试主动推送功能\n"
             "/help - 显示本帮助\n"
             "\n"
             "其他消息会正常和番茄猫聊天喵~ (｡•ᴗ-｡)♡"

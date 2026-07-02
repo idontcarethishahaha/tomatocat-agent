@@ -62,6 +62,8 @@ class CLISocketChannel(Channel):
                     "type": "text",
                     "content": response.get("text", ""),
                     "media_paths": [str(p) for p in response.get("media_paths", [])],
+                    "thinking": response.get("thinking", ""),
+                    "tool_calls": response.get("tool_calls", []),
                 }, ensure_ascii=False)
                 writer.write((response_data + "\n").encode("utf-8"))
                 await writer.drain()

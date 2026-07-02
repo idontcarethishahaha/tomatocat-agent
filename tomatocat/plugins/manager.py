@@ -29,6 +29,7 @@ class PluginManager:
         self.event_bus = event_bus
         self.session_manager = session_manager
         self.memory = memory
+        self.proactive = None
         self._plugins: dict[str, Plugin] = {}
         self._tools: dict[str, ToolInfo] = {}
 

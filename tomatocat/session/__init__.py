@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ChatMessage:
     role: str
-    content: str
+    content: str | list[dict[str, Any]]
     tool_calls: list[dict[str, Any]] = field(default_factory=list)
     tool_call_id: str | None = None
     name: str | None = None
@@ -40,8 +40,14 @@ class Session:
         self.messages.append(message)
         self._trim_history()
 
-    def add_user_message(self, text: str) -> None:
-        self.add_message(ChatMessage(role="user", content=text))
+    def add_user_message(self, text: str, images: list[dict[str, Any]] | None = None) -> None:
+        """添加用户消息。images 为 OpenAI 兼容格式的 image_url 列表。"""
+        if images:
+            content: list[dict[str, Any]] = list(images)
+            content.append({"type": "text", "text": text})
+            self.add_message(ChatMessage(role="user", content=content))
+        else:
+            self.add_message(ChatMessage(role="user", content=text))
 
     def add_assistant_message(self, text: str, tool_calls: list[dict] | None = None) -> None:
         self.add_message(ChatMessage(

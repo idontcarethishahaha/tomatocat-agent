@@ -137,20 +137,21 @@ async def serve(config_path: Path, workspace: Path) -> None:
         tg_channel = TelegramChannel(
             token=config.channels.telegram.token,
             allow_from=config.channels.telegram.allow_from,
+            upload_dir=workspace / "uploads",
         )
         channels.append(tg_channel)
 
-    if config.channels.qq.enabled and config.channels.qq.napcat_ws:
+    if config.channels.qq.enabled and config.channels.qq.bot_uin:
         qq_channel = QQChannel(
-            ws_url=config.channels.qq.napcat_ws,
             bot_uin=config.channels.qq.bot_uin,
             allow_from=config.channels.qq.allow_from,
             groups=config.channels.qq.groups,
+            upload_dir=workspace / "uploads",
         )
         channels.append(qq_channel)
 
-    async def message_handler(session_key: str, text: str, channel: str) -> dict:
-        return await agent.handle_message(session_key, text, channel)
+    async def message_handler(session_key: str, text: str, channel: str, **kwargs: Any) -> dict:
+        return await agent.handle_message(session_key, text, channel, **kwargs)
 
     for ch in channels:
         ch.set_handler(message_handler)
@@ -181,6 +182,7 @@ async def serve(config_path: Path, workspace: Path) -> None:
             target_chat_id=config.proactive.target.chat_id,
         )
         proactive.start()
+        plugin_manager.proactive = proactive
         logger.info(f"主动推送已启动，目标: {config.proactive.target.channel}")
 
     # ── 定时任务 Scheduler ──────────────────────────────────────

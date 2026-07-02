@@ -1,12 +1,14 @@
-"""番茄猫 Agent 核心循环"""
+"""番茄猫 Agent 核心循环（流式）"""
 
 from __future__ import annotations
 
 import asyncio
+import base64
 import logging
+import mimetypes
 from datetime import datetime, timedelta, timezone as _tz_utc
 from pathlib import Path
-from typing import Any
+from typing import Any, Awaitable, Callable
 
 from ..config import Config
 from ..bus import EventBus, InboundMessage, OutboundMessage, TurnStartEvent, TurnEndEvent
@@ -20,6 +22,25 @@ try:
     from zoneinfo import ZoneInfo
 except ImportError:
     ZoneInfo = None
+
+
+def _encode_image_base64(image_path: str | Path) -> dict[str, Any] | None:
+    """将本地图片转为 OpenAI 兼容的 image_url 格式（base64 data URL）。"""
+    p = Path(image_path)
+    if not p.is_file():
+        return None
+    mime, _ = mimetypes.guess_type(p.name)
+    if not mime or not mime.startswith("image/"):
+        return None
+    try:
+        b64 = base64.b64encode(p.read_bytes()).decode("ascii")
+    except Exception as e:
+        logger.warning("[agent] 图片编码失败 %s: %s", p.name, e)
+        return None
+    return {
+        "type": "image_url",
+        "image_url": {"url": f"data:{mime};base64,{b64}"},
+    }
 
 
 def _weekday_cn(dt: datetime) -> str:
@@ -36,14 +57,7 @@ def build_message_time_envelope(
     message_time: datetime,
     timezone_name: str = "Asia/Shanghai",
 ) -> str:
-    """构建消息时间信封，附加在用户消息前。
-
-    包含：
-    - 当前消息时间（本地时区可读格式）
-    - request_time（ISO 格式，用于 schedule 工具延迟补偿）
-    - 今天/昨天/明天/后天 日期
-    - 星期
-    """
+    """构建消息时间信封，附加在用户消息前。"""
     if ZoneInfo:
         try:
             tzinfo = ZoneInfo(timezone_name)
@@ -73,8 +87,11 @@ def build_message_time_envelope(
     )
 
 
+StreamDeltaFn = Callable[[str, str, str, dict[str, Any]], Awaitable[None]]
+
+
 class TomatoCatAgent:
-    """番茄猫核心 Agent"""
+    """番茄猫核心 Agent（流式输出）"""
 
     def __init__(
         self,
@@ -101,12 +118,21 @@ class TomatoCatAgent:
             enable_thinking=config.llm_main.enable_thinking,
         )
 
-        # 快速 LLM（用于记忆提取和整合，用小模型省 token）
         self._fast_llm = LLMProvider(
             model=config.llm_fast.model,
             api_key=config.llm_fast.api_key,
             base_url=config.llm_fast.base_url,
         )
+
+        self._vl_llm: LLMProvider | None = None
+        if config.llm_vl.model:
+            self._vl_llm = LLMProvider(
+                model=config.llm_vl.model,
+                api_key=config.llm_vl.api_key,
+                base_url=config.llm_vl.base_url,
+                enable_thinking=config.llm_main.enable_thinking,
+            )
+            logger.info(f"[agent] 视觉模型已加载: {config.llm_vl.model}")
 
         self._system_prompt = config.agent.system_prompt
 
@@ -117,16 +143,22 @@ class TomatoCatAgent:
                 memory_context = self.memory.get_context_block()
                 if memory_context:
                     prompt += f"\n\n{memory_context}"
+                    logger.debug("[agent] 记忆上下文已注入")
             except Exception as e:
                 logger.warning(f"[agent] 记忆上下文获取失败: {e}")
-        # 注入 meme 协议说明（只有有素材时才注入）
+        # 注入 meme 协议说明
         if self.meme_service:
             try:
                 meme_block = self.meme_service.build_prompt_block()
                 if meme_block:
                     prompt += f"\n\n{meme_block}"
+                    logger.info(f"[agent] meme 协议已注入，长度 {len(meme_block)} 字符")
+                else:
+                    logger.warning("[agent] meme_block 为空，可能没有可用图片分类")
             except Exception as e:
                 logger.warning(f"[agent] meme 协议注入失败: {e}")
+        else:
+            logger.warning("[agent] meme_service 未初始化")
         return prompt
 
     async def handle_message(
@@ -135,20 +167,25 @@ class TomatoCatAgent:
         text: str,
         channel: str = "cli",
         message_time: datetime | None = None,
+        on_delta: StreamDeltaFn | None = None,
+        media_paths: list[str] | None = None,
     ) -> dict[str, Any]:
-        """处理用户消息，返回 {"text": str, "media_paths": list[Path]}"""
+        """处理用户消息，返回最终回复
+
+        Args:
+            session_key: 会话 key
+            text: 用户消息
+            channel: 渠道名
+            message_time: 消息时间
+            on_delta: 流式 delta 回调 (channel, chat_id, delta_type, data)
+            media_paths: 附件图片本地路径列表（多模态分析）
+
+        Returns:
+            {"text": str, "media_paths": list[Path], "thinking": str, "tool_calls": list[dict]}
+        """
         session = self.session_manager.get_or_create(session_key)
 
         await self.event_bus.emit(TurnStartEvent(session_key))
-
-        # 命令拦截：/ping /status /version /help 等不经过 LLM
-        if text.strip().startswith("/"):
-            status_plugin = self.plugin_manager.plugins.get("status_commands")
-            if status_plugin:
-                cmd_reply = status_plugin.handle_command(text, session_key, channel)
-                if cmd_reply is not None:
-                    await self.event_bus.emit(TurnEndEvent(session_key, cmd_reply))
-                    return {"text": cmd_reply, "media_paths": []}
 
         if not session.messages:
             system_prompt = self._build_system_with_memory()
@@ -172,23 +209,62 @@ class TomatoCatAgent:
             timezone_name=self.config.scheduler.timezone,
         )
         user_text_with_time = time_envelope + text
-        session.add_user_message(user_text_with_time)
+
+        # 处理图片附件（多模态）
+        image_contents: list[dict[str, Any]] = []
+        if media_paths:
+            for p in media_paths:
+                img = _encode_image_base64(p)
+                if img:
+                    image_contents.append(img)
+            if image_contents:
+                logger.info("[agent] 收到 %d 张图片，启用视觉分析", len(image_contents))
+
+        if image_contents:
+            session.add_user_message(user_text_with_time, images=image_contents)
+        else:
+            session.add_user_message(user_text_with_time)
 
         final_response = ""
+        final_thinking = ""
+        all_tool_calls: list[dict[str, Any]] = []
         tools = self.plugin_manager.get_all_tools()
 
         for iteration in range(self.config.agent.max_iterations):
             logger.info("[agent] 第 %d 轮推理", iteration + 1)
 
+            async def _delta(delta: dict[str, str]) -> None:
+                if on_delta:
+                    await on_delta(channel, session_key, "streaming_delta", delta)
+
             messages = session.get_messages()
-            response = await self.llm.chat(
+
+            # 判断是否需要用视觉模型（消息中有图片内容时）
+            use_vl = False
+            if self._vl_llm is not None:
+                for msg in messages:
+                    content = msg.get("content")
+                    if isinstance(content, list):
+                        for part in content:
+                            if isinstance(part, dict) and part.get("type") == "image_url":
+                                use_vl = True
+                                break
+                        if use_vl:
+                            break
+
+            active_llm = self._vl_llm if use_vl else self.llm
+            if use_vl and iteration == 0:
+                logger.info("[agent] 使用视觉模型进行推理")
+
+            response = await active_llm.chat(
                 messages=messages,
                 tools=tools if tools else None,
                 max_tokens=self.config.agent.max_tokens,
+                on_delta=_delta if on_delta and iteration == 0 else None,
             )
 
             if response.thinking:
-                logger.info("[agent] 思考过程: %s", response.thinking[:200])
+                final_thinking += response.thinking + "\n\n"
 
             if response.tool_calls:
                 tool_call_dicts = [
@@ -205,9 +281,22 @@ class TomatoCatAgent:
                 session.add_assistant_message(response.content or "", tool_calls=tool_call_dicts)
 
                 for tc in response.tool_calls:
+                    tool_info = {"name": tc.name, "status": "running"}
+                    all_tool_calls.append(tool_info)
+
+                    if on_delta:
+                        await on_delta(channel, session_key, "tool_call_start", tool_info)
+
                     logger.info("[agent] 调用工具: %s(%s)", tc.name, tc.arguments)
                     result = await self.plugin_manager.execute_tool(tc.name, tc.arguments)
                     logger.info("[agent] 工具结果: %s", result[:200] if result else "(空)")
+
+                    tool_info["status"] = "done"
+                    tool_info["result_preview"] = result[:200] if result else ""
+
+                    if on_delta:
+                        await on_delta(channel, session_key, "tool_call_done", tool_info)
+
                     session.add_tool_result(tc.id, tc.name, result)
 
                 continue
@@ -220,13 +309,14 @@ class TomatoCatAgent:
         if not final_response:
             final_response = "喵... 番茄猫卡住了，请再说一次？(・_・;)"
 
-        # meme 表情包处理：提取 <meme:tag> 标签，返回媒体路径
-        meme_media_paths: list[Any] = []
+        media_paths: list[Path] = []
         if self.meme_service and final_response:
             try:
                 meme_result = self.meme_service.decorate_reply(final_response)
                 final_response = meme_result.text
-                meme_media_paths = meme_result.media_paths
+                media_paths = meme_result.media_paths
+                if media_paths:
+                    logger.info(f"[meme] 匹配到 {len(media_paths)} 个媒体")
             except Exception as e:
                 logger.warning(f"[meme] 处理失败: {e}")
 
@@ -236,27 +326,28 @@ class TomatoCatAgent:
             except Exception:
                 pass
 
-            # 异步提取记忆（不阻塞回复）
             asyncio.create_task(self._post_conversation_memory(text, final_response))
 
         await self.event_bus.emit(TurnEndEvent(session_key, final_response))
 
-        return {"text": final_response, "media_paths": meme_media_paths}
+        return {
+            "text": final_response,
+            "media_paths": media_paths,
+            "thinking": final_thinking.strip(),
+            "tool_calls": all_tool_calls,
+        }
 
     async def _post_conversation_memory(self, user_text: str, assistant_text: str) -> None:
-        """对话后异步处理：提取记忆 → 定时整合"""
         if not self.memory:
             return
 
         try:
-            # 1. 用快速 LLM 提取关键信息到 PENDING
             await self.memory.extract_and_pending(
                 user_text=user_text,
                 assistant_text=assistant_text,
                 llm_call=self._fast_llm.simple_chat,
             )
 
-            # 2. 检查是否该触发整合
             if self.memory.tick_conversation():
                 logger.info("[agent] 对话轮次达到阈值，触发记忆整合")
                 await self.memory.consolidate(self._fast_llm.simple_chat)

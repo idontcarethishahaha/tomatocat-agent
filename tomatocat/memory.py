@@ -293,10 +293,11 @@ class MemoryEngine:
     def should_consolidate(self) -> bool:
         """检查 PENDING 是否有内容需要整合"""
         pending = self.get_pending()
-        # 去掉注释和空白后检查是否有实际内容
         lines = [
             line.strip() for line in pending.splitlines()
-            if line.strip() and not line.strip().startswith("<!--")
+            if line.strip()
+            and not line.strip().startswith("<!--")
+            and not line.strip().startswith("#")
         ]
         return len(lines) > 0
 

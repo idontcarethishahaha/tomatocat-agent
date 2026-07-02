@@ -37,6 +37,10 @@ class PluginContext:
     def memory(self) -> Any:
         return self._manager.memory
 
+    @property
+    def proactive(self) -> Any:
+        return getattr(self._manager, "proactive", None)
+
 
 class Plugin(ABC):
     """所有插件的基类"""
