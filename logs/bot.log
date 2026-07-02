@@ -1368,3 +1368,190 @@ ID: d1f6189a260b
 [2026-07-02 16:12:52,888.888] INFO     tomatocat.mcp_client 'mcp_client.py:191' | [mcp] weather 已关闭
 [2026-07-02 16:12:52,905.905] INFO     tomatocat.mcp_client 'mcp_client.py:191' | [mcp] arxiv 已关闭
 [2026-07-02 16:12:52,905.905] INFO     tomatocat.mcp_client 'mcp_client.py:272' | [mcp] 所有连接已关闭
+[2026-07-02 16:18:22,282.282] INFO     tomatocat.channels.qq 'qq.py:151' | [qq] 正在启动 NcatBot...
+[2026-07-02 16:18:22,284.284] INFO     Config 'config.py:404' | [BOTQQ]: 3834637415 | [WSURI]: ws://localhost:3001 | [WS_TOKEN]: NcatBot | [ROOT]: 3269725546 | [WEBUI]: http://localhost:6099 | [WEBUI_TOKEN]: NcatBot
+[2026-07-02 16:18:22,286.286] INFO     Config 'config.py:111' | 配置已保存到 D:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\config.yaml
+[2026-07-02 16:18:22,395.395] INFO     SystemManager 'system_manager.py:162' | 文件监视守护线程已启动
+[2026-07-02 16:18:22,395.395] INFO     SystemManager 'system_manager.py:59' | 启动文件监视线程，监视目录: plugins
+[2026-07-02 16:18:22,396.396] INFO     SystemManager 'system_manager.py:34' | 检测到文件变化: plugins\accounting\plugin.py
+[2026-07-02 16:18:22,396.396] INFO     SystemManager 'system_manager.py:34' | 检测到文件变化: plugins\accounting\__init__.py
+[2026-07-02 16:18:22,398.398] INFO     SystemManager 'system_manager.py:34' | 检测到文件变化: plugins\filesystem\plugin.py
+[2026-07-02 16:18:22,398.398] INFO     SystemManager 'system_manager.py:34' | 检测到文件变化: plugins\filesystem\__init__.py
+[2026-07-02 16:18:22,398.398] INFO     SystemManager 'system_manager.py:34' | 检测到文件变化: plugins\memory\plugin.py
+[2026-07-02 16:18:22,399.399] INFO     SystemManager 'system_manager.py:34' | 检测到文件变化: plugins\memory\__init__.py
+[2026-07-02 16:18:22,399.399] INFO     PluginLoader 'loader.py:339' | 已加载内置插件数 [2]
+[2026-07-02 16:18:22,400.400] INFO     PluginLoader 'loader.py:353' | 从 D:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\plugins 导入插件
+[2026-07-02 16:18:22,400.400] INFO     SystemManager 'system_manager.py:34' | 检测到文件变化: plugins\memory2\plugin.py
+[2026-07-02 16:18:22,400.400] INFO     SystemManager 'system_manager.py:34' | 检测到文件变化: plugins\memory2\__init__.py
+[2026-07-02 16:18:22,401.401] INFO     SystemManager 'system_manager.py:34' | 检测到文件变化: plugins\pixel_cat\plugin.py
+[2026-07-02 16:18:22,402.402] INFO     SystemManager 'system_manager.py:34' | 检测到文件变化: plugins\pixel_cat\__init__.py
+[2026-07-02 16:18:22,402.402] INFO     PluginLoader 'loader.py:133' | 正在加载模块: accounting from D:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\plugins\accounting
+[2026-07-02 16:18:22,402.402] INFO     SystemManager 'system_manager.py:34' | 检测到文件变化: plugins\scheduler\plugin.py
+[2026-07-02 16:18:22,403.403] INFO     SystemManager 'system_manager.py:34' | 检测到文件变化: plugins\scheduler\__init__.py
+[2026-07-02 16:18:22,403.403] INFO     SystemManager 'system_manager.py:34' | 检测到文件变化: plugins\shell\plugin.py
+[2026-07-02 16:18:22,403.403] INFO     SystemManager 'system_manager.py:34' | 检测到文件变化: plugins\shell\__init__.py
+[2026-07-02 16:18:22,403.403] INFO     PluginLoader 'loader.py:135' | 模块 accounting 加载成功
+[2026-07-02 16:18:22,405.405] INFO     SystemManager 'system_manager.py:34' | 检测到文件变化: plugins\status_commands\plugin.py
+[2026-07-02 16:18:22,405.405] WARNING  PluginLoader 'loader.py:373' | 在模块中未找到插件类 'accounting'
+[2026-07-02 16:18:22,405.405] INFO     SystemManager 'system_manager.py:34' | 检测到文件变化: plugins\status_commands\__init__.py
+[2026-07-02 16:18:22,405.405] INFO     PluginLoader 'loader.py:133' | 正在加载模块: filesystem from D:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\plugins\filesystem
+[2026-07-02 16:18:22,406.406] INFO     SystemManager 'system_manager.py:34' | 检测到文件变化: plugins\study_plan\plugin.py
+[2026-07-02 16:18:22,406.406] INFO     SystemManager 'system_manager.py:34' | 检测到文件变化: plugins\study_plan\__init__.py
+[2026-07-02 16:18:22,407.407] INFO     SystemManager 'system_manager.py:34' | 检测到文件变化: plugins\web_fetch\plugin.py
+[2026-07-02 16:18:22,407.407] INFO     SystemManager 'system_manager.py:34' | 检测到文件变化: plugins\web_fetch\__init__.py
+[2026-07-02 16:18:22,408.408] INFO     PluginLoader 'loader.py:135' | 模块 filesystem 加载成功
+[2026-07-02 16:18:22,409.409] WARNING  PluginLoader 'loader.py:373' | 在模块中未找到插件类 'filesystem'
+[2026-07-02 16:18:22,408.408] INFO     SystemManager 'system_manager.py:34' | 检测到文件变化: plugins\web_search\plugin.py
+[2026-07-02 16:18:22,410.410] INFO     SystemManager 'system_manager.py:34' | 检测到文件变化: plugins\web_search\__init__.py
+[2026-07-02 16:18:22,410.410] INFO     PluginLoader 'loader.py:133' | 正在加载模块: memory from D:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\plugins\memory
+[2026-07-02 16:18:22,411.411] INFO     PluginLoader 'loader.py:135' | 模块 memory 加载成功
+[2026-07-02 16:18:22,411.411] WARNING  PluginLoader 'loader.py:373' | 在模块中未找到插件类 'memory'
+[2026-07-02 16:18:22,413.413] INFO     PluginLoader 'loader.py:133' | 正在加载模块: memory2 from D:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\plugins\memory2
+[2026-07-02 16:18:22,413.413] INFO     PluginLoader 'loader.py:135' | 模块 memory2 加载成功
+[2026-07-02 16:18:22,415.415] WARNING  PluginLoader 'loader.py:373' | 在模块中未找到插件类 'memory2'
+[2026-07-02 16:18:22,415.415] INFO     PluginLoader 'loader.py:133' | 正在加载模块: pixel_cat from D:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\plugins\pixel_cat
+[2026-07-02 16:18:22,416.416] INFO     PluginLoader 'loader.py:135' | 模块 pixel_cat 加载成功
+[2026-07-02 16:18:22,416.416] WARNING  PluginLoader 'loader.py:373' | 在模块中未找到插件类 'pixel_cat'
+[2026-07-02 16:18:22,417.417] INFO     PluginLoader 'loader.py:133' | 正在加载模块: scheduler from D:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\plugins\scheduler
+[2026-07-02 16:18:22,419.419] INFO     PluginLoader 'loader.py:135' | 模块 scheduler 加载成功
+[2026-07-02 16:18:22,419.419] WARNING  PluginLoader 'loader.py:373' | 在模块中未找到插件类 'scheduler'
+[2026-07-02 16:18:22,419.419] INFO     PluginLoader 'loader.py:133' | 正在加载模块: shell from D:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\plugins\shell
+[2026-07-02 16:18:22,420.420] INFO     PluginLoader 'loader.py:135' | 模块 shell 加载成功
+[2026-07-02 16:18:22,420.420] WARNING  PluginLoader 'loader.py:373' | 在模块中未找到插件类 'shell'
+[2026-07-02 16:18:22,422.422] INFO     PluginLoader 'loader.py:133' | 正在加载模块: status_commands from D:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\plugins\status_commands
+[2026-07-02 16:18:22,422.422] INFO     PluginLoader 'loader.py:135' | 模块 status_commands 加载成功
+[2026-07-02 16:18:22,423.423] WARNING  PluginLoader 'loader.py:373' | 在模块中未找到插件类 'status_commands'
+[2026-07-02 16:18:22,424.424] INFO     PluginLoader 'loader.py:133' | 正在加载模块: study_plan from D:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\plugins\study_plan
+[2026-07-02 16:18:22,425.425] INFO     PluginLoader 'loader.py:135' | 模块 study_plan 加载成功
+[2026-07-02 16:18:22,425.425] WARNING  PluginLoader 'loader.py:373' | 在模块中未找到插件类 'study_plan'
+[2026-07-02 16:18:22,427.427] INFO     PluginLoader 'loader.py:133' | 正在加载模块: web_fetch from D:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\plugins\web_fetch
+[2026-07-02 16:18:22,429.429] INFO     PluginLoader 'loader.py:135' | 模块 web_fetch 加载成功
+[2026-07-02 16:18:22,429.429] WARNING  PluginLoader 'loader.py:373' | 在模块中未找到插件类 'web_fetch'
+[2026-07-02 16:18:22,430.430] INFO     PluginLoader 'loader.py:133' | 正在加载模块: web_search from D:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\plugins\web_search
+[2026-07-02 16:18:22,430.430] INFO     PluginLoader 'loader.py:135' | 模块 web_search 加载成功
+[2026-07-02 16:18:22,430.430] WARNING  PluginLoader 'loader.py:373' | 在模块中未找到插件类 'web_search'
+[2026-07-02 16:18:22,432.432] INFO     PluginLoader 'loader.py:378' | 已加载插件数 [2]
+[2026-07-02 16:18:22,433.433] INFO     ncatbot.core.adapter.nc.launch 'launch.py:107' | 正在以远端模式运行, 检查中...
+[2026-07-02 16:18:22,437.437] INFO     ncatbot.core.adapter.nc.launch 'launch.py:73' | napcat 服务器 ws://localhost:3001 在线, 正在检查账号状态...
+[2026-07-02 16:18:22,437.437] INFO     ncatbot.core.adapter.nc.launch 'launch.py:96' | NapCat 未启用 WebUI, 无法检查登录状态, 请自行确保 NapCat 已经登录了正确的 QQ
+[2026-07-02 16:18:22,437.437] INFO     Adapter 'adapter.py:91' | NapCat WebSocket 连接成功
+[2026-07-02 16:18:22,439.439] INFO     Client 'client.py:121' | Bot 3834637415 启动成功
+[2026-07-02 16:18:22,439.439] INFO     tomatocat.channels.qq 'qq.py:149' | [qq] NcatBot 已启动
+[2026-07-02 16:18:22,440.440] INFO     tomatocat.channels.qq 'qq.py:153' | [qq] QQ 渠道已启动
+[2026-07-02 16:18:22,448.448] INFO     tomatocat.proactive.engine 'engine.py:70' | [proactive] 已加载状态，已处理 62 条
+[2026-07-02 16:18:22,448.448] INFO     tomatocat 'main.py:186' | 主动推送已启动，目标: telegram
+[2026-07-02 16:18:22,448.448] INFO     tomatocat.scheduler 'scheduler.py:563' | [scheduler] 已加载 0 个任务
+[2026-07-02 16:18:22,450.450] INFO     tomatocat.scheduler 'scheduler.py:540' | [scheduler] 恢复了 0 个任务
+[2026-07-02 16:18:22,450.450] INFO     tomatocat.scheduler 'scheduler.py:309' | [scheduler] 定时任务服务已启动，当前 0 个任务
+[2026-07-02 16:18:22,450.450] INFO     tomatocat 'main.py:222' | 定时任务插件已关联，默认目标: telegram:8824997206
+[2026-07-02 16:18:22,450.450] INFO     tomatocat 'main.py:224' | 定时任务服务已启动，时区: Asia/Shanghai
+[2026-07-02 16:18:22,451.451] INFO     tomatocat.proactive.engine 'engine.py:253' | [proactive] 主动推送循环已启动，间隔 180s
+[2026-07-02 16:18:26,876.876] WARNING  tomatocat.proactive.engine 'engine.py:135' | [proactive] 获取 arxiv/get_proactive_events 失败: Expecting value: line 1 column 1 (char 0)
+[2026-07-02 16:18:26,876.876] INFO     tomatocat.proactive.engine 'engine.py:137' | [proactive] 获取到 0 条新事件
+[2026-07-02 16:19:25,576.576] INFO     tomatocat 'main.py:232' | 收到退出信号，正在关闭...
+[2026-07-02 16:19:25,578.578] INFO     tomatocat.proactive.engine 'engine.py:273' | [proactive] 已停止
+[2026-07-02 16:19:25,578.578] INFO     tomatocat.scheduler 'scheduler.py:320' | [scheduler] 定时任务服务已停止
+[2026-07-02 16:19:26,987.987] INFO     tomatocat.channels.qq 'qq.py:163' | [qq] QQ 渠道已停止
+[2026-07-02 16:19:27,002.002] INFO     tomatocat.mcp_client 'mcp_client.py:191' | [mcp] weather 已关闭
+[2026-07-02 16:19:27,017.017] INFO     tomatocat.mcp_client 'mcp_client.py:191' | [mcp] arxiv 已关闭
+[2026-07-02 16:19:27,019.019] INFO     tomatocat.mcp_client 'mcp_client.py:272' | [mcp] 所有连接已关闭
+[2026-07-02 16:28:22,386.386] INFO     tomatocat.channels.qq 'qq.py:151' | [qq] 正在启动 NcatBot...
+[2026-07-02 16:28:22,390.390] INFO     Config 'config.py:404' | [BOTQQ]: 3834637415 | [WSURI]: ws://localhost:3001 | [WS_TOKEN]: NcatBot | [ROOT]: 3269725546 | [WEBUI]: http://localhost:6099 | [WEBUI_TOKEN]: NcatBot
+[2026-07-02 16:28:22,392.392] INFO     Config 'config.py:111' | 配置已保存到 D:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\config.yaml
+[2026-07-02 16:28:22,477.477] INFO     SystemManager 'system_manager.py:162' | 文件监视守护线程已启动
+[2026-07-02 16:28:22,477.477] INFO     SystemManager 'system_manager.py:59' | 启动文件监视线程，监视目录: plugins
+[2026-07-02 16:28:22,479.479] INFO     SystemManager 'system_manager.py:34' | 检测到文件变化: plugins\accounting\plugin.py
+[2026-07-02 16:28:22,479.479] INFO     SystemManager 'system_manager.py:34' | 检测到文件变化: plugins\accounting\__init__.py
+[2026-07-02 16:28:22,479.479] INFO     SystemManager 'system_manager.py:34' | 检测到文件变化: plugins\filesystem\plugin.py
+[2026-07-02 16:28:22,479.479] INFO     SystemManager 'system_manager.py:34' | 检测到文件变化: plugins\filesystem\__init__.py
+[2026-07-02 16:28:22,481.481] INFO     SystemManager 'system_manager.py:34' | 检测到文件变化: plugins\memory\plugin.py
+[2026-07-02 16:28:22,481.481] INFO     PluginLoader 'loader.py:339' | 已加载内置插件数 [2]
+[2026-07-02 16:28:22,481.481] INFO     SystemManager 'system_manager.py:34' | 检测到文件变化: plugins\memory\__init__.py
+[2026-07-02 16:28:22,482.482] INFO     PluginLoader 'loader.py:353' | 从 D:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\plugins 导入插件
+[2026-07-02 16:28:22,482.482] INFO     SystemManager 'system_manager.py:34' | 检测到文件变化: plugins\memory2\plugin.py
+[2026-07-02 16:28:22,482.482] INFO     SystemManager 'system_manager.py:34' | 检测到文件变化: plugins\memory2\__init__.py
+[2026-07-02 16:28:22,483.483] INFO     SystemManager 'system_manager.py:34' | 检测到文件变化: plugins\pixel_cat\plugin.py
+[2026-07-02 16:28:22,483.483] INFO     PluginLoader 'loader.py:133' | 正在加载模块: accounting from D:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\plugins\accounting
+[2026-07-02 16:28:22,484.484] INFO     SystemManager 'system_manager.py:34' | 检测到文件变化: plugins\pixel_cat\__init__.py
+[2026-07-02 16:28:22,484.484] INFO     SystemManager 'system_manager.py:34' | 检测到文件变化: plugins\scheduler\plugin.py
+[2026-07-02 16:28:22,484.484] INFO     SystemManager 'system_manager.py:34' | 检测到文件变化: plugins\scheduler\__init__.py
+[2026-07-02 16:28:22,484.484] INFO     SystemManager 'system_manager.py:34' | 检测到文件变化: plugins\shell\plugin.py
+[2026-07-02 16:28:22,484.484] INFO     SystemManager 'system_manager.py:34' | 检测到文件变化: plugins\shell\__init__.py
+[2026-07-02 16:28:22,484.484] INFO     PluginLoader 'loader.py:135' | 模块 accounting 加载成功
+[2026-07-02 16:28:22,484.484] WARNING  PluginLoader 'loader.py:373' | 在模块中未找到插件类 'accounting'
+[2026-07-02 16:28:22,484.484] INFO     SystemManager 'system_manager.py:34' | 检测到文件变化: plugins\status_commands\plugin.py
+[2026-07-02 16:28:22,486.486] INFO     SystemManager 'system_manager.py:34' | 检测到文件变化: plugins\status_commands\__init__.py
+[2026-07-02 16:28:22,486.486] INFO     PluginLoader 'loader.py:133' | 正在加载模块: filesystem from D:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\plugins\filesystem
+[2026-07-02 16:28:22,487.487] INFO     SystemManager 'system_manager.py:34' | 检测到文件变化: plugins\study_plan\plugin.py
+[2026-07-02 16:28:22,487.487] INFO     SystemManager 'system_manager.py:34' | 检测到文件变化: plugins\study_plan\__init__.py
+[2026-07-02 16:28:22,487.487] INFO     PluginLoader 'loader.py:135' | 模块 filesystem 加载成功
+[2026-07-02 16:28:22,487.487] INFO     SystemManager 'system_manager.py:34' | 检测到文件变化: plugins\web_fetch\plugin.py
+[2026-07-02 16:28:22,487.487] WARNING  PluginLoader 'loader.py:373' | 在模块中未找到插件类 'filesystem'
+[2026-07-02 16:28:22,488.488] INFO     SystemManager 'system_manager.py:34' | 检测到文件变化: plugins\web_fetch\__init__.py
+[2026-07-02 16:28:22,488.488] INFO     PluginLoader 'loader.py:133' | 正在加载模块: memory from D:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\plugins\memory
+[2026-07-02 16:28:22,488.488] INFO     SystemManager 'system_manager.py:34' | 检测到文件变化: plugins\web_search\plugin.py
+[2026-07-02 16:28:22,489.489] INFO     SystemManager 'system_manager.py:34' | 检测到文件变化: plugins\web_search\__init__.py
+[2026-07-02 16:28:22,490.490] INFO     PluginLoader 'loader.py:135' | 模块 memory 加载成功
+[2026-07-02 16:28:22,490.490] WARNING  PluginLoader 'loader.py:373' | 在模块中未找到插件类 'memory'
+[2026-07-02 16:28:22,491.491] INFO     PluginLoader 'loader.py:133' | 正在加载模块: memory2 from D:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\plugins\memory2
+[2026-07-02 16:28:22,491.491] INFO     PluginLoader 'loader.py:135' | 模块 memory2 加载成功
+[2026-07-02 16:28:22,492.492] WARNING  PluginLoader 'loader.py:373' | 在模块中未找到插件类 'memory2'
+[2026-07-02 16:28:22,492.492] INFO     PluginLoader 'loader.py:133' | 正在加载模块: pixel_cat from D:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\plugins\pixel_cat
+[2026-07-02 16:28:22,494.494] INFO     PluginLoader 'loader.py:135' | 模块 pixel_cat 加载成功
+[2026-07-02 16:28:22,494.494] WARNING  PluginLoader 'loader.py:373' | 在模块中未找到插件类 'pixel_cat'
+[2026-07-02 16:28:22,494.494] INFO     PluginLoader 'loader.py:133' | 正在加载模块: scheduler from D:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\plugins\scheduler
+[2026-07-02 16:28:22,496.496] INFO     PluginLoader 'loader.py:135' | 模块 scheduler 加载成功
+[2026-07-02 16:28:22,496.496] WARNING  PluginLoader 'loader.py:373' | 在模块中未找到插件类 'scheduler'
+[2026-07-02 16:28:22,496.496] INFO     PluginLoader 'loader.py:133' | 正在加载模块: shell from D:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\plugins\shell
+[2026-07-02 16:28:22,497.497] INFO     PluginLoader 'loader.py:135' | 模块 shell 加载成功
+[2026-07-02 16:28:22,497.497] WARNING  PluginLoader 'loader.py:373' | 在模块中未找到插件类 'shell'
+[2026-07-02 16:28:22,498.498] INFO     PluginLoader 'loader.py:133' | 正在加载模块: status_commands from D:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\plugins\status_commands
+[2026-07-02 16:28:22,499.499] INFO     PluginLoader 'loader.py:135' | 模块 status_commands 加载成功
+[2026-07-02 16:28:22,499.499] WARNING  PluginLoader 'loader.py:373' | 在模块中未找到插件类 'status_commands'
+[2026-07-02 16:28:22,499.499] INFO     PluginLoader 'loader.py:133' | 正在加载模块: study_plan from D:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\plugins\study_plan
+[2026-07-02 16:28:22,500.500] INFO     PluginLoader 'loader.py:135' | 模块 study_plan 加载成功
+[2026-07-02 16:28:22,500.500] WARNING  PluginLoader 'loader.py:373' | 在模块中未找到插件类 'study_plan'
+[2026-07-02 16:28:22,502.502] INFO     PluginLoader 'loader.py:133' | 正在加载模块: web_fetch from D:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\plugins\web_fetch
+[2026-07-02 16:28:22,503.503] INFO     PluginLoader 'loader.py:135' | 模块 web_fetch 加载成功
+[2026-07-02 16:28:22,504.504] WARNING  PluginLoader 'loader.py:373' | 在模块中未找到插件类 'web_fetch'
+[2026-07-02 16:28:22,504.504] INFO     PluginLoader 'loader.py:133' | 正在加载模块: web_search from D:\ai学习项目\akashic-agent-study\tomatocat-agent-v2\plugins\web_search
+[2026-07-02 16:28:22,505.505] INFO     PluginLoader 'loader.py:135' | 模块 web_search 加载成功
+[2026-07-02 16:28:22,505.505] WARNING  PluginLoader 'loader.py:373' | 在模块中未找到插件类 'web_search'
+[2026-07-02 16:28:22,505.505] INFO     PluginLoader 'loader.py:378' | 已加载插件数 [2]
+[2026-07-02 16:28:22,506.506] INFO     ncatbot.core.adapter.nc.launch 'launch.py:107' | 正在以远端模式运行, 检查中...
+[2026-07-02 16:28:22,509.509] INFO     ncatbot.core.adapter.nc.launch 'launch.py:73' | napcat 服务器 ws://localhost:3001 在线, 正在检查账号状态...
+[2026-07-02 16:28:22,509.509] INFO     ncatbot.core.adapter.nc.launch 'launch.py:96' | NapCat 未启用 WebUI, 无法检查登录状态, 请自行确保 NapCat 已经登录了正确的 QQ
+[2026-07-02 16:28:22,511.511] INFO     Adapter 'adapter.py:91' | NapCat WebSocket 连接成功
+[2026-07-02 16:28:22,512.512] INFO     Client 'client.py:121' | Bot 3834637415 启动成功
+[2026-07-02 16:28:22,512.512] INFO     tomatocat.channels.qq 'qq.py:149' | [qq] NcatBot 已启动
+[2026-07-02 16:28:22,512.512] INFO     tomatocat.channels.qq 'qq.py:153' | [qq] QQ 渠道已启动
+[2026-07-02 16:28:22,521.521] INFO     tomatocat.proactive.engine 'engine.py:70' | [proactive] 已加载状态，已处理 62 条
+[2026-07-02 16:28:22,521.521] INFO     tomatocat 'main.py:186' | 主动推送已启动，目标: telegram
+[2026-07-02 16:28:22,523.523] INFO     tomatocat.scheduler 'scheduler.py:563' | [scheduler] 已加载 0 个任务
+[2026-07-02 16:28:22,523.523] INFO     tomatocat.scheduler 'scheduler.py:540' | [scheduler] 恢复了 0 个任务
+[2026-07-02 16:28:22,523.523] INFO     tomatocat.scheduler 'scheduler.py:309' | [scheduler] 定时任务服务已启动，当前 0 个任务
+[2026-07-02 16:28:22,523.523] INFO     tomatocat 'main.py:222' | 定时任务插件已关联，默认目标: telegram:8824997206
+[2026-07-02 16:28:22,523.523] INFO     tomatocat 'main.py:224' | 定时任务服务已启动，时区: Asia/Shanghai
+[2026-07-02 16:28:22,523.523] INFO     tomatocat.proactive.engine 'engine.py:253' | [proactive] 主动推送循环已启动，间隔 180s
+[2026-07-02 16:28:22,540.540] INFO     tomatocat.proactive.engine 'engine.py:137' | [proactive] 获取到 1 条新事件
+[2026-07-02 16:28:29,528.528] INFO     tomatocat.proactive.engine 'engine.py:235' | [proactive] 没有值得推送的内容
+[2026-07-02 16:31:06,322.322] INFO     tomatocat.session '__init__.py:87' | [session] 创建新会话: telegram:8824997206
+[2026-07-02 16:31:06,325.325] INFO     tomatocat.agent.agent 'agent.py:278' | [agent] meme 协议已注入，长度 496 字符
+[2026-07-02 16:31:06,687.687] INFO     tomatocat.agent.agent 'agent.py:323' | [agent] 找到 3 条相关记忆
+[2026-07-02 16:31:06,689.689] INFO     tomatocat.agent.agent 'agent.py:360' | [agent] 第 1 轮推理
+[2026-07-02 16:31:11,950.950] INFO     tomatocat.agent.agent 'agent.py:416' | [agent] 调用工具: schedule({'tier': 'soft', 'trigger': 'at', 'when': '16:35', 'name': '写题提醒', 'message': '该写题了喵~(≧∇≦)ﾉ', 'chat_id': 'telegram:8824997206', 'request_time': '2026-07-02T16:31:06.688547+08:00'})
+[2026-07-02 16:31:11,951.951] INFO     tomatocat.agent.agent 'agent.py:418' | [agent] 工具结果: 喵？tier=soft 时 prompt 为必填项 (・_・;)
+[2026-07-02 16:31:11,951.951] INFO     tomatocat.agent.agent 'agent.py:360' | [agent] 第 2 轮推理
+[2026-07-02 16:31:14,642.642] INFO     tomatocat.agent.agent 'agent.py:416' | [agent] 调用工具: schedule({'tier': 'soft', 'trigger': 'at', 'when': '16:35', 'name': '写题提醒', 'message': '该写题了喵~(≧∇≦)ﾉ', 'prompt': '提醒用户写LeetCode题目，这是今日学习计划的一部分', 'chat_id': 'telegram:8824997206', 'request_time': '2026-07-02T16:31:06.688547+08:00'})
+[2026-07-02 16:31:14,642.642] WARNING  tomatocat.scheduler 'scheduler.py:51' | [scheduler] ZoneInfo 无法加载 'Asia/Shanghai'，fallback 到 UTC+8（此警告仅显示一次）
+[2026-07-02 16:31:14,648.648] INFO     tomatocat.scheduler 'scheduler.py:369' | [scheduler] 任务已添加: 29aaede3 (写题提醒) trigger=at mode=soft fire_at=2026-07-02 08:35:00 UTC
+[2026-07-02 16:31:14,648.648] INFO     tomatocat.agent.agent 'agent.py:418' | [agent] 工具结果: ⏰ 已设置 AI 定时任务 「写题提醒」
+在 2026-07-02 16:35:00
+提示词: 提醒用户写LeetCode题目，这是今日学习计划的一部分
+[2026-07-02 16:31:14,649.649] INFO     tomatocat.agent.agent 'agent.py:360' | [agent] 第 3 轮推理
+[2026-07-02 16:31:20,843.843] INFO     tomatocat.memory 'memory.py:342' | [memory] 提取记忆到 PENDING: - 16:35提醒写题
+- 一次性提醒，仅今日有效
+- 番茄猫设置提醒
+- 提醒写LeetCode题目
+- 按时完成学习...
+[2026-07-02 16:31:29,549.549] INFO     tomatocat.proactive.engine 'engine.py:137' | [proactive] 获取到 0 条新事件

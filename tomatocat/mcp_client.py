@@ -208,7 +208,7 @@ class MCPClient:
             log.info(f"[mcp] 配置文件不存在: {config_path}，跳过 MCP 初始化")
             return []
 
-        with open(config_path, "r", encoding="utf-8") as f:
+        with open(config_path, "r", encoding="utf-8-sig") as f:
             config = json.load(f)
 
         servers_cfg = config.get("servers", {})
