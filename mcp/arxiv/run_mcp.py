@@ -69,7 +69,7 @@ def _fetch_papers() -> list[dict]:
     }
     url = ARXIV_BASE + "?" + urllib.parse.urlencode(params)
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": "akashic-agent/1.0"})
+        req = urllib.request.Request(url, headers={"User-Agent": "tomatocat-agent/1.0"})
         with urllib.request.urlopen(req, timeout=20) as resp:
             data = resp.read().decode("utf-8")
     except Exception:

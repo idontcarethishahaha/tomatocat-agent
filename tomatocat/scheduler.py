@@ -1,6 +1,6 @@
 """定时任务模块
 
-参考 akashic-agent 的 scheduler.py 实现，支持：
+scheduler.py 实现，支持：
 - 三种触发模式：at（指定时间）、after（延迟）、every（周期）
 - 两种执行模式：instant（直接发消息）、soft（让AI生成）
 - request_time 延迟补偿（从用户发消息时刻计算）

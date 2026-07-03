@@ -103,7 +103,7 @@ class StatusCommandsPlugin(Plugin):
         return "\n".join(lines)
 
     def _cmd_version(self, **kw) -> str:
-        return f"🍅🐱 番茄猫 TomatoCat v{_VERSION}\n基于 akashic-agent 架构学习实现"
+        return f"🍅🐱 番茄猫 TomatoCat v{_VERSION}\n"
 
     def _cmd_proactive_test(self, **kw) -> str:
         proactive = self.context.proactive

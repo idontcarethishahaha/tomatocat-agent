@@ -18,7 +18,7 @@ from config_mgr import load_config
 
 ROOT = Path(__file__).parent
 DEFAULT_GIF_DIR = ROOT / "sprites_gif"
-MYCAT_DIR = Path(r"D:\ai学习项目\akashic-agent-study\mycat")
+MYCAT_DIR = Path(r"D:\images\mycat")
 
 PET_SIZE = SPRITE_SIZE * SCALE
 

@@ -116,20 +116,41 @@ class PetSystems:
     def _setup_tray(self):
         if not QSystemTrayIcon.isSystemTrayAvailable():
             return
-        pixmap = QPixmap(32, 32)
-        pixmap.fill(Qt.GlobalColor.transparent)
-        p = QPainter(pixmap)
-        p.fillRect(10, 6, 4, 4, QColor("#D4692B"))
-        p.fillRect(18, 6, 4, 4, QColor("#D4692B"))
-        p.fillRect(4, 10, 24, 16, QColor("#FF8C42"))
-        p.fillRect(8, 14, 8, 8, QColor("#FFFFFF"))
-        p.fillRect(16, 14, 8, 8, QColor("#FFFFFF"))
-        p.fillRect(11, 17, 3, 3, QColor("#2D2D2D"))
-        p.fillRect(19, 17, 3, 3, QColor("#2D2D2D"))
-        p.end()
 
-        self._tray = QSystemTrayIcon(QIcon(pixmap), self.pet)
-        self._tray.setToolTip("桌面宠物 - 喵~")
+        # 优先使用用户自定义图标
+        from pathlib import Path
+        ROOT = Path(__file__).parent
+        icon_paths = [
+            ROOT / "icon.ico",
+            ROOT / "icon.png",
+            ROOT / "cat.ico",
+            ROOT / "cat.png",
+            ROOT / "pet.ico",
+            ROOT / "pet.png",
+        ]
+        icon = None
+        for ip in icon_paths:
+            if ip.exists():
+                icon = QIcon(str(ip))
+                break
+
+        if icon is None:
+            # fallback: draw a simple pixel cat
+            pixmap = QPixmap(32, 32)
+            pixmap.fill(Qt.GlobalColor.transparent)
+            p = QPainter(pixmap)
+            p.fillRect(10, 6, 4, 4, QColor("#D4692B"))
+            p.fillRect(18, 6, 4, 4, QColor("#D4692B"))
+            p.fillRect(4, 10, 24, 16, QColor("#FF8C42"))
+            p.fillRect(8, 14, 8, 8, QColor("#FFFFFF"))
+            p.fillRect(16, 14, 8, 8, QColor("#FFFFFF"))
+            p.fillRect(11, 17, 3, 3, QColor("#2D2D2D"))
+            p.fillRect(19, 17, 3, 3, QColor("#2D2D2D"))
+            p.end()
+            icon = QIcon(pixmap)
+
+        self._tray = QSystemTrayIcon(icon, self.pet)
+        self._tray.setToolTip(" 🍅🐱 番茄猫")
 
         m = QMenu()
         m.addAction("显示/隐藏").triggered.connect(self._toggle_visible)
@@ -249,11 +270,11 @@ class PetSystems:
         from PyQt6.QtWidgets import QMessageBox
         QMessageBox.about(
             self.pet,
-            "关于 桌面宠物",
-            "🐱 桌面宠物 v1.0\n\n"
-            "一只住在你桌面上的像素猫。\n"
-            "PyQt5 + DeepSeek AI 驱动。\n\n"
-            "GitHub: github.com/Sober05/desktop-pet\n"
+            "关于 🍅🐱 番茄猫",
+            "🍅🐱 番茄猫 v1.0\n\n"
+            "一只住在你桌面上的像素小猫咪。\n"
+            "PyQt6 + AI 驱动。\n\n"
+            "GitHub: https://github.com/idontcarethishahaha/tomatocat-agent\n"
             "License: MIT"
         )
 
