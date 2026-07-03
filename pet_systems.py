@@ -9,6 +9,7 @@ from PyQt6.QtGui import QPainter, QColor, QIcon, QPixmap, QAction
 
 from sprites import ANIMATIONS
 from config_mgr import load_config, save_config
+from tomato_timer import TomatoTimer
 
 
 class IdleDetector:
@@ -76,6 +77,7 @@ class PetSystems:
         self._tray = None
         self._menu = None
         self._bubble_label = None
+        self._tomato_timer = None
 
         # Mood
         self._mood = self._cfg.get("mood", 70)
@@ -165,6 +167,7 @@ class PetSystems:
         # -- Primary actions --
         self._menu.addAction("💬 聊天").triggered.connect(self.pet._open_chat)
         self._menu.addAction("😴 睡觉/醒来").triggered.connect(self._toggle_sleep)
+        self._menu.addAction("🍅 番茄钟").triggered.connect(self._open_tomato_timer)
         self._menu.addSeparator()
 
         # -- Quick launch --
@@ -304,6 +307,13 @@ class PetSystems:
             self._wake_up()
         else:
             self._enter_sleep()
+
+    def _open_tomato_timer(self):
+        if self._tomato_timer is None:
+            self._tomato_timer = TomatoTimer(pet_window=self.pet)
+        self._tomato_timer.show()
+        self._tomato_timer.raise_()
+        self._tomato_timer.activateWindow()
 
     @property
     def is_sleeping(self):
