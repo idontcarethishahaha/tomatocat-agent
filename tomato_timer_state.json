@@ -1,5 +1,16 @@
 {
-  "tasks": [],
+  "tasks": [
+    {
+      "text": "LeetCode 刷题",
+      "done": false,
+      "pomodoros": 0
+    },
+    {
+      "text": "看Spring AI(一)",
+      "done": false,
+      "pomodoros": 0
+    }
+  ],
   "today_minutes": 0,
   "date": "2026-07-03"
 }

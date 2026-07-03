@@ -103,7 +103,7 @@ class TomatoTimer(QWidget):
             | Qt.WindowType.Tool
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.resize(280, 460)
+        self.resize(300, 560)
 
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(10, 10, 10, 10)
@@ -114,8 +114,8 @@ class TomatoTimer(QWidget):
         main_layout.addWidget(self._container)
 
         layout = QVBoxLayout(self._container)
-        layout.setContentsMargins(16, 16, 16, 16)
-        layout.setSpacing(10)
+        layout.setContentsMargins(16, 14, 16, 14)
+        layout.setSpacing(8)
 
         # Header
         header = QHBoxLayout()
@@ -126,7 +126,7 @@ class TomatoTimer(QWidget):
 
         self._close_btn = QPushButton("✕")
         self._close_btn.setObjectName("iconBtn")
-        self._close_btn.setFixedSize(26, 26)
+        self._close_btn.setFixedSize(24, 24)
         self._close_btn.clicked.connect(self.hide)
         header.addWidget(self._close_btn)
         layout.addLayout(header)
@@ -145,7 +145,7 @@ class TomatoTimer(QWidget):
 
         # Circle progress
         self._progress = CircleProgress(self._container)
-        self._progress.setFixedSize(180, 180)
+        self._progress.setFixedSize(170, 170)
         layout.addWidget(self._progress, alignment=Qt.AlignmentFlag.AlignCenter)
 
         # Time label
@@ -185,10 +185,15 @@ class TomatoTimer(QWidget):
         self._stats_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self._stats_label)
 
+        # --- Task section ---
+        task_title = QLabel("📋 今日任务")
+        task_title.setObjectName("taskTitle")
+        layout.addWidget(task_title)
+
         # Task input
         task_input_layout = QHBoxLayout()
         self._task_input = QLineEdit()
-        self._task_input.setPlaceholderText("加个任务喵~")
+        self._task_input.setPlaceholderText("加个任务喵~  按回车添加")
         self._task_input.returnPressed.connect(self._add_task)
         task_input_layout.addWidget(self._task_input)
 
@@ -203,6 +208,9 @@ class TomatoTimer(QWidget):
         self._task_list = QListWidget()
         self._task_list.setObjectName("taskList")
         self._task_list.itemClicked.connect(self._task_selected)
+        self._task_list.itemDoubleClicked.connect(self._toggle_task_done)
+        self._task_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self._task_list.customContextMenuRequested.connect(self._task_context_menu)
         layout.addWidget(self._task_list, stretch=1)
 
         task_ctrl = QHBoxLayout()
@@ -267,6 +275,12 @@ class TomatoTimer(QWidget):
             #statsLabel {
                 font-size: 11px;
                 color: #AAAAAA;
+            }
+            #taskTitle {
+                font-size: 13px;
+                font-weight: bold;
+                color: #FF6B6B;
+                margin-top: 4px;
             }
             #primaryBtn {
                 background: #FF6B6B;
@@ -462,10 +476,43 @@ class TomatoTimer(QWidget):
 
     def _delete_task(self):
         idx = self._task_list.currentRow()
-        if 0 <= idx < len(self._tasks):
+        if idx < 0 or idx >= len(self._tasks):
+            return
+        task_text = self._tasks[idx].text
+        reply = QMessageBox.question(
+            self, "删除任务",
+            f"确定要删除「{task_text}」吗？",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+        if reply == QMessageBox.StandardButton.Yes:
             del self._tasks[idx]
             self._refresh_task_list()
             self._save_state()
+
+    def _task_context_menu(self, pos):
+        idx = self._task_list.indexAt(pos)
+        if not idx.isValid():
+            return
+        row = idx.row()
+        if row < 0 or row >= len(self._tasks):
+            return
+        self._task_list.setCurrentRow(row)
+
+        from PyQt6.QtWidgets import QMenu
+        menu = QMenu(self._task_list)
+        menu.setStyleSheet("""
+            QMenu { background: white; border: 1px solid #FFD0DA; border-radius: 8px; padding: 4px; }
+            QMenu::item { padding: 6px 20px; border-radius: 6px; color: #5A4A4A; }
+            QMenu::item:selected { background: #FFE4E9; color: #FF6B6B; }
+        """)
+        action_done = menu.addAction("✓ 切换完成状态")
+        action_delete = menu.addAction("🗑 删除任务")
+        action = menu.exec(self._task_list.mapToGlobal(pos))
+        if action == action_done:
+            self._toggle_task_done()
+        elif action == action_delete:
+            self._delete_task()
 
     def _increment_active_task_pomodoro(self):
         """Add a pomodoro to the first unfinished task."""
