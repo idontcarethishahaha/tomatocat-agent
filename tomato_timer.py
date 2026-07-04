@@ -15,9 +15,6 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QTimer, QPoint, QRect, QRectF, pyqtSignal, QSize
 from PyQt6.QtGui import QPainter, QColor, QFont, QFontDatabase, QPen, QMouseEvent, QBrush, QPainterPath
 
-ROOT = Path(__file__).parent
-TIMER_STATE_FILE = ROOT / "tomato_timer_state.json"
-
 DEFAULT_MODES = {
     "work": {"label": "专注", "minutes": 25, "color": "#FF6B6B"},
     "short": {"label": "短休", "minutes": 5, "color": "#4ECDC4"},
@@ -75,11 +72,15 @@ class TomatoTimer(QWidget):
     finished = pyqtSignal(str)  # mode label
     state_changed = pyqtSignal(str)
 
-    def __init__(self, pet_window=None):
+    def __init__(self, pet_window=None, workspace: str = ""):
         super().__init__()
         self.pet = pet_window
         self._dragging = False
         self._drag_offset = QPoint()
+
+        # 状态文件放到 workspace 下，便于隔离
+        ws = Path(workspace) if workspace else Path.cwd()
+        self._state_file = ws / "tomato_timer_state.json"
 
         self._mode = "work"
         self._remaining_seconds = DEFAULT_MODES["work"]["minutes"] * 60
@@ -540,8 +541,8 @@ class TomatoTimer(QWidget):
 
     def _load_state(self):
         try:
-            if TIMER_STATE_FILE.exists():
-                data = json.loads(TIMER_STATE_FILE.read_text(encoding="utf-8"))
+            if self._state_file.exists():
+                data = json.loads(self._state_file.read_text(encoding="utf-8"))
                 self._tasks = [TaskItem(**t) for t in data.get("tasks", [])]
                 self._today_minutes = data.get("today_minutes", 0)
                 # reset date
@@ -559,7 +560,7 @@ class TomatoTimer(QWidget):
                 "today_minutes": self._today_minutes,
                 "date": time.strftime("%Y-%m-%d"),
             }
-            TIMER_STATE_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+            self._state_file.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
         except Exception:
             pass
 

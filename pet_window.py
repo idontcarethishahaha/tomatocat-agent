@@ -37,10 +37,11 @@ ANIMATION_MAP = {
 
 
 class PetWindow(QWidget):
-    def __init__(self, agent_context=None, agent_loop=None):
+    def __init__(self, agent_context=None, agent_loop=None, workspace: str = ""):
         super().__init__()
         self.agent_context = agent_context
         self.agent_loop = agent_loop
+        self.workspace = workspace
         self._chat = None
 
         self._dragging = False
@@ -59,7 +60,7 @@ class PetWindow(QWidget):
         else:
             self._setup_sprite_animation()
 
-        self.sys = PetSystems(self)
+        self.sys = PetSystems(self, workspace=self.workspace)
 
         self._anim_name = "idle"
         if self._use_gif:

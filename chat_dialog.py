@@ -11,8 +11,19 @@ from pathlib import Path
 from html import escape as html_escape
 from config_mgr import load_config
 
-CHAT_LOG_PATH = Path(__file__).parent / "chat-history.json"
+_CHAT_LOG_PATH = None
 MAX_CHAT_HISTORY = 50
+
+
+def set_chat_log_path(path: str | Path):
+    global _CHAT_LOG_PATH
+    _CHAT_LOG_PATH = Path(path)
+
+
+def _get_chat_log_path():
+    if _CHAT_LOG_PATH is not None:
+        return _CHAT_LOG_PATH
+    return Path(__file__).parent / "chat-history.json"
 
 _default_theme = {
     "bg": "#FFFFFF",
@@ -154,8 +165,9 @@ class ChatBubble(QWidget):
 
     def _load_history(self):
         try:
-            if CHAT_LOG_PATH.exists():
-                msgs = json.loads(CHAT_LOG_PATH.read_text(encoding="utf-8"))
+            path = _get_chat_log_path()
+            if path.exists():
+                msgs = json.loads(path.read_text(encoding="utf-8"))
                 for m in msgs[-MAX_CHAT_HISTORY:]:
                     role = m.get("role", "")
                     content = m.get("content", "")
@@ -163,15 +175,17 @@ class ChatBubble(QWidget):
                         self._append_text("你", self._theme["user_color"], content)
                         self._history.append(m)
                     elif role == "assistant":
-                        self._append_text("🐾 番茄猫", self._theme["assistant_color"], content)
+                        self._append_text("番茄猫", self._theme["assistant_color"], content)
                         self._history.append(m)
         except Exception:
             pass
 
     def _save_history(self):
         try:
+            path = _get_chat_log_path()
+            path.parent.mkdir(parents=True, exist_ok=True)
             data = self._history[-MAX_CHAT_HISTORY:]
-            CHAT_LOG_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2),
+            path.write_text(json.dumps(data, ensure_ascii=False, indent=2),
                                      encoding="utf-8")
         except Exception:
             pass

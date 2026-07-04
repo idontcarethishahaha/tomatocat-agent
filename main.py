@@ -275,7 +275,16 @@ async def _serve_forever(config_path: Path, workspace: Path) -> None:
 def _run_desktop(config_path: Path, workspace: Path) -> None:
     """桌面宠物模式：主线程 Qt，子线程 asyncio agent"""
     import time
-    from error_log import log_startup, log_shutdown, log_error
+    from error_log import log_startup, log_shutdown, log_error, set_log_path
+    from config_mgr import set_config_path
+
+    # 把桌面相关的状态文件都放到 workspace 下的 pet/ 子目录
+    pet_dir = workspace / "pet"
+    pet_dir.mkdir(parents=True, exist_ok=True)
+    set_log_path(pet_dir / "pet-log.txt")
+    set_config_path(pet_dir / "config.json")
+    from chat_dialog import set_chat_log_path
+    set_chat_log_path(pet_dir / "chat-history.json")
 
     agent_context = {}
     agent_ready = threading.Event()
@@ -401,7 +410,7 @@ def _run_desktop(config_path: Path, workspace: Path) -> None:
 
     exit_code = 0
     try:
-        pet = PetWindow(agent_context=agent_context, agent_loop=agent_loop)
+        pet = PetWindow(agent_context=agent_context, agent_loop=agent_loop, workspace=str(workspace))
         pet.show()
 
         def health_check():

@@ -3,28 +3,38 @@ import json
 import os
 from pathlib import Path
 
-CONFIG_PATH = Path(__file__).parent / "config.json"
+_CONFIG_PATH = None
+
+
+def set_config_path(path: str | Path):
+    global _CONFIG_PATH
+    _CONFIG_PATH = Path(path)
+
+
+def _get_config_path():
+    if _CONFIG_PATH is not None:
+        return _CONFIG_PATH
+    return Path(__file__).parent / "config.json"
 
 
 def load_config():
-    """Load config from config.json. Returns empty dict if not found."""
-    if CONFIG_PATH.exists():
+    if _get_config_path().exists():
         try:
-            return json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+            return json.loads(_get_config_path().read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
             pass
     return {}
 
 
 def save_config(cfg):
-    """Save config to config.json."""
-    CONFIG_PATH.write_text(
+    path = _get_config_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
         json.dumps(cfg, ensure_ascii=False, indent=2),
         encoding="utf-8")
 
 
 def get_api_key():
-    """API key priority: env var DEEPSEEK_API_KEY > config.json."""
     env_key = os.environ.get("DEEPSEEK_API_KEY", "")
     if env_key:
         return env_key
@@ -32,5 +42,4 @@ def get_api_key():
 
 
 def get_model():
-    """Get model name from config."""
     return load_config().get("model", "deepseek-chat")

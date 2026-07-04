@@ -71,8 +71,9 @@ class IdleDetector:
 class PetSystems:
     """Manages tray, menu, idle detection, mood, proactive chat, clipboard."""
 
-    def __init__(self, pet_window):
+    def __init__(self, pet_window, workspace: str = ""):
         self.pet = pet_window
+        self.workspace = workspace
         self._cfg = load_config()
         self._tray = None
         self._menu = None
@@ -81,6 +82,7 @@ class PetSystems:
 
         # Mood
         self._mood = self._cfg.get("mood", 70)
+        self._last_save_time = 0
 
         # Idle sleep
         self._is_sleeping = False
@@ -331,7 +333,7 @@ class PetSystems:
 
     def _open_tomato_timer(self):
         if self._tomato_timer is None:
-            self._tomato_timer = TomatoTimer(pet_window=self.pet)
+            self._tomato_timer = TomatoTimer(pet_window=self.pet, workspace=self.workspace)
         self._tomato_timer.show()
         self._tomato_timer.raise_()
         self._tomato_timer.activateWindow()
@@ -349,11 +351,21 @@ class PetSystems:
     def boost_mood(self, amount):
         self._mood = min(100, self._mood + amount)
         self._refresh_mood_display()
+        self._save_state_debounced()
 
     def _decay_mood(self):
         if not self._is_sleeping:
             self._mood = max(0, self._mood - 1)
         self._refresh_mood_display()
+        self._save_state_debounced()
+
+    def _save_state_debounced(self):
+        # 防抖：5 分钟内最多写一次磁盘，避免文件时间一直在变
+        import time
+        now = time.time()
+        if now - self._last_save_time < 300:
+            return
+        self._last_save_time = now
         self._save_state()
 
     def _save_state(self):
