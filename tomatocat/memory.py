@@ -7,6 +7,7 @@
 - HISTORY.md       : 永久追加的事件日志
 - journal/         : 每日日记，追加写入
 - vectors.json     : 向量检索索引
+- Checkpoint 机制   : 整合过程支持检查点，失败后可重试
 """
 
 from __future__ import annotations
@@ -20,6 +21,7 @@ from typing import Any, Callable, Awaitable
 
 import numpy as np
 
+from .checkpoint import CheckpointManager
 from .embedding import EmbeddingService
 
 log = logging.getLogger(__name__)
@@ -77,6 +79,7 @@ class MemoryEngine:
         workspace: Path,
         embedding: EmbeddingService | None = None,
         vector_enabled: bool = True,
+        checkpoint_manager: CheckpointManager | None = None,
     ):
         self.workspace = workspace
         self.memory_dir = workspace / "memory"
@@ -85,6 +88,7 @@ class MemoryEngine:
         self.journal_dir.mkdir(exist_ok=True)
         self.embedding = embedding
         self.vector_enabled = vector_enabled and embedding is not None
+        self._checkpoint_manager = checkpoint_manager
         self._items: list[MemoryItem] = []
         self._vector_store_path = self.memory_dir / "vectors.json"
         self._pending_path = self.memory_dir / "PENDING.md"
@@ -383,34 +387,86 @@ class MemoryEngine:
 
 请输出更新后的完整长期记忆（直接输出 Markdown，不要包裹代码块）："""
 
+        checkpoint_id = None
         try:
+            if self._checkpoint_manager:
+                checkpoint_id = self._checkpoint_manager.create(
+                    task_type="memory_consolidation",
+                    task_id=f"consolidation_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                    current_goal="整合 PENDING.md 到 MEMORY.md",
+                    completed=[],
+                    next_step="调用 LLM 生成整合结果",
+                    metadata={
+                        "pending_length": len(pending),
+                        "memory_length": len(current_memory),
+                    },
+                    trigger="consolidation_start"
+                )["checkpoint_id"]
+                log.info("[memory] 创建整合检查点: %s", checkpoint_id)
+
             result = await llm_call(prompt)
             result = result.strip()
 
-            # 去掉可能的代码块包裹
+            if self._checkpoint_manager:
+                self._checkpoint_manager.create(
+                    task_type="memory_consolidation",
+                    task_id=f"consolidation_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                    current_goal="整合 PENDING.md 到 MEMORY.md",
+                    completed=["LLM 调用完成"],
+                    next_step="写入 MEMORY.md",
+                    metadata={
+                        "result_length": len(result),
+                    },
+                    trigger="llm_completed"
+                )
+
             if result.startswith("```"):
                 lines = result.splitlines()
                 result = "\n".join(lines[1:-1] if lines[-1].startswith("```") else lines[1:])
 
             if not result or len(result) < 10:
                 log.warning("[memory] 整合结果为空，跳过")
+                if self._checkpoint_manager and checkpoint_id:
+                    self._checkpoint_manager.create(
+                        task_type="memory_consolidation",
+                        task_id=f"consolidation_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                        current_goal="整合 PENDING.md 到 MEMORY.md",
+                        completed=[],
+                        blocker="整合结果为空",
+                        metadata={},
+                        trigger="consolidation_failed"
+                    )
                 return False
 
-            # 写入新的 MEMORY.md
             self.update_memory_md(result)
 
-            # 记录到 HISTORY
             self.append_history(f"consolidation: 整合了 PENDING 到 MEMORY.md")
 
-            # 清空 PENDING
             self.clear_pending()
 
-            # 重置计数器
             self.reset_conversation_counter()
+
+            if self._checkpoint_manager and checkpoint_id:
+                self._checkpoint_manager.mark_completed(checkpoint_id, "记忆整合完成")
+                log.info("[memory] 整合检查点已完成: %s", checkpoint_id)
 
             log.info("[memory] 记忆整合完成，PENDING 已清空")
             return True
 
         except Exception as e:
             log.error(f"[memory] 记忆整合失败: {e}")
+            if self._checkpoint_manager and checkpoint_id:
+                self._checkpoint_manager.create(
+                    task_type="memory_consolidation",
+                    task_id=f"consolidation_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                    current_goal="整合 PENDING.md 到 MEMORY.md",
+                    completed=[],
+                    next_step="重试整合",
+                    blocker=str(e),
+                    metadata={
+                        "error": str(e),
+                    },
+                    trigger="consolidation_failed"
+                )
+                log.warning("[memory] 整合失败已记录到检查点")
             return False

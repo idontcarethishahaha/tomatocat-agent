@@ -337,6 +337,56 @@ class VectorMemoryStore:
                 ).fetchall()
             return [MemoryItem.from_row(r) for r in rows]
 
+    def list_items(
+        self,
+        query: str = "",
+        memory_type: str = "",
+        status: str = "",
+        page: int = 1,
+        page_size: int = 50,
+    ) -> list[dict[str, Any]]:
+        """列表查询（用于 Dashboard）"""
+        with self._lock:
+            assert self._conn is not None
+
+            conditions = []
+            params: list[Any] = []
+
+            if memory_type:
+                conditions.append("memory_type = ?")
+                params.append(memory_type)
+
+            if status:
+                conditions.append("status = ?")
+                params.append(status)
+
+            where_clause = "WHERE " + " AND ".join(conditions) if conditions else ""
+
+            offset = (page - 1) * page_size
+            rows = self._conn.execute(
+                f"""SELECT * FROM memory_items
+                   {where_clause}
+                   ORDER BY created_at DESC
+                   LIMIT ? OFFSET ?""",
+                params + [page_size, offset],
+            ).fetchall()
+
+            result = []
+            for row in rows:
+                item = MemoryItem.from_row(row)
+                result.append({
+                    "id": item.id,
+                    "memory_type": item.memory_type,
+                    "summary": item.summary,
+                    "reinforcement": item.reinforcement,
+                    "emotional_weight": item.emotional_weight,
+                    "status": item.status,
+                    "created_at": item.created_at,
+                    "updated_at": item.updated_at,
+                    "source_ref": item.source_ref,
+                })
+            return result
+
     def count(self, memory_type: str | None = None) -> int:
         """统计记忆数量"""
         with self._lock:

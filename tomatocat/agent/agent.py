@@ -14,6 +14,15 @@ from ..config import Config
 from ..bus import EventBus, InboundMessage, OutboundMessage, TurnStartEvent, TurnEndEvent
 from ..session import SessionManager
 from ..plugins.manager import PluginManager
+from ..lifecycle import (
+    BeforeTurnCtx,
+    BeforeReasoningCtx,
+    BeforeStepCtx,
+    PromptRenderCtx,
+    AfterStepCtx,
+    AfterReasoningCtx,
+    AfterTurnCtx,
+)
 from .llm import LLMProvider, LLMResponse, ToolCall
 
 logger = logging.getLogger(__name__)
@@ -225,6 +234,7 @@ class TomatoCatAgent:
         plugin_manager: PluginManager,
         memory: Any = None,
         meme_service: Any = None,
+        skills_loader: Any = None,
     ) -> None:
         self.config = config
         self.workspace = workspace
@@ -233,6 +243,7 @@ class TomatoCatAgent:
         self.plugin_manager = plugin_manager
         self.memory = memory
         self.meme_service = meme_service
+        self.skills_loader = skills_loader
 
         self.llm = LLMProvider(
             model=config.llm_main.model,
@@ -269,7 +280,23 @@ class TomatoCatAgent:
                     logger.debug("[agent] 记忆上下文已注入")
             except Exception as e:
                 logger.warning(f"[agent] 记忆上下文获取失败: {e}")
-        # 注入 meme 协议说明
+
+        if self.skills_loader:
+            try:
+                skills_summary = self.skills_loader.build_skills_summary()
+                if skills_summary:
+                    prompt += f"\n\n## 可用技能\n{skills_summary}"
+                    logger.info(f"[agent] 技能摘要已注入，{len(self.skills_loader.list_skills())} 个技能")
+
+                always_skills = self.skills_loader.get_always_skills()
+                if always_skills:
+                    always_content = self.skills_loader.load_skills_for_context(always_skills)
+                    if always_content:
+                        prompt += f"\n\n## 常驻技能\n{always_content}"
+                        logger.info(f"[agent] 常驻技能已注入: {always_skills}")
+            except Exception as e:
+                logger.warning(f"[agent] 技能加载失败: {e}")
+
         if self.meme_service:
             try:
                 meme_block = self.meme_service.build_prompt_block()
@@ -308,6 +335,28 @@ class TomatoCatAgent:
         """
         session = self.session_manager.get_or_create(session_key)
 
+        if message_time is None:
+            message_time = datetime.now(_tz_utc.utc)
+
+        chat_id = session_key.split(":")[-1] if ":" in session_key else session_key
+
+        before_turn_ctx = BeforeTurnCtx(
+            session_key=session_key,
+            channel=channel,
+            chat_id=chat_id,
+            content=text,
+            timestamp=message_time,
+        )
+        before_turn_ctx = await self.event_bus.emit(before_turn_ctx)
+        if before_turn_ctx.abort:
+            logger.info("[agent] before_turn 中断，回复: %s", before_turn_ctx.abort_reply)
+            return {
+                "text": before_turn_ctx.abort_reply,
+                "media_paths": [],
+                "thinking": "",
+                "tool_calls": [],
+            }
+
         await self.event_bus.emit(TurnStartEvent(session_key))
 
         if not session.messages:
@@ -315,17 +364,16 @@ class TomatoCatAgent:
             system_prompt += build_current_session_prompt(channel=channel, chat_id=session_key)
             session.messages.insert(0, _system_message(system_prompt))
 
+        retrieved_memory_block = ""
         if self.memory:
             try:
                 related = await self.memory.search(text, top_k=3)
                 if related:
                     mem_text = "\n".join(f"- {r['content'][:80]}" for r in related)
+                    retrieved_memory_block = mem_text
                     logger.info(f"[agent] 找到 {len(related)} 条相关记忆")
             except Exception:
                 pass
-
-        if message_time is None:
-            message_time = datetime.now(_tz_utc.utc)
 
         time_envelope = build_message_time_envelope(
             message_time,
@@ -333,7 +381,6 @@ class TomatoCatAgent:
         )
         user_text_with_time = time_envelope + text
 
-        # 处理图片附件（多模态）
         image_contents: list[dict[str, Any]] = []
         if media_paths:
             for p in media_paths:
@@ -355,17 +402,59 @@ class TomatoCatAgent:
         final_thinking = ""
         all_tool_calls: list[dict[str, Any]] = []
         tools = self.plugin_manager.get_all_tools()
+        tools_used_so_far: list[str] = []
+        partial_reply = ""
 
         for iteration in range(self.config.agent.max_iterations):
             logger.info("[agent] 第 %d 轮推理", iteration + 1)
+
+            messages = session.get_messages()
+
+            before_reasoning_ctx = BeforeReasoningCtx(
+                session_key=session_key,
+                channel=channel,
+                chat_id=chat_id,
+                content=text,
+                timestamp=message_time,
+                skill_names=before_turn_ctx.skill_names,
+                retrieved_memory_block=retrieved_memory_block,
+                extra_hints=before_turn_ctx.extra_hints,
+            )
+            before_reasoning_ctx = await self.event_bus.emit(before_reasoning_ctx)
+            if before_reasoning_ctx.abort:
+                logger.info("[agent] before_reasoning 中断，回复: %s", before_reasoning_ctx.abort_reply)
+                final_response = before_reasoning_ctx.abort_reply
+                break
+
+            prompt_render_ctx = PromptRenderCtx(
+                session_key=session_key,
+                channel=channel,
+                chat_id=chat_id,
+                content=text,
+                timestamp=message_time,
+                history=messages,
+                skill_names=before_reasoning_ctx.skill_names,
+                retrieved_memory_block=before_reasoning_ctx.retrieved_memory_block,
+                extra_hints=before_reasoning_ctx.extra_hints,
+            )
+            prompt_render_ctx = await self.event_bus.emit(prompt_render_ctx)
+
+            before_step_ctx = BeforeStepCtx(
+                session_key=session_key,
+                channel=channel,
+                chat_id=chat_id,
+                iteration=iteration,
+            )
+            before_step_ctx = await self.event_bus.emit(before_step_ctx)
+            if before_step_ctx.early_stop:
+                logger.info("[agent] before_step 提前终止，回复: %s", before_step_ctx.early_stop_reply)
+                final_response = before_step_ctx.early_stop_reply
+                break
 
             async def _delta(delta: dict[str, str]) -> None:
                 if on_delta:
                     await on_delta(channel, session_key, "streaming_delta", delta)
 
-            messages = session.get_messages()
-
-            # 判断是否需要用视觉模型（消息中有图片内容时）
             use_vl = False
             if self._vl_llm is not None:
                 for msg in messages:
@@ -406,6 +495,9 @@ class TomatoCatAgent:
                 ]
                 session.add_assistant_message(response.content or "", tool_calls=tool_call_dicts)
 
+                tool_names = [tc.name for tc in response.tool_calls]
+                tools_used_so_far.extend(tool_names)
+
                 for tc in response.tool_calls:
                     tool_info = {"name": tc.name, "status": "running"}
                     all_tool_calls.append(tool_info)
@@ -425,24 +517,60 @@ class TomatoCatAgent:
 
                     session.add_tool_result(tc.id, tc.name, result)
 
+                after_step_ctx = AfterStepCtx(
+                    session_key=session_key,
+                    channel=channel,
+                    chat_id=chat_id,
+                    iteration=iteration,
+                    tools_called=tuple(tool_names),
+                    partial_reply=partial_reply,
+                    tools_used_so_far=tuple(tools_used_so_far),
+                    has_more=True,
+                )
+                await self.event_bus.fanout(after_step_ctx)
                 continue
 
             if response.content:
                 final_response = response.content
+                partial_reply = response.content
                 session.add_assistant_message(response.content)
+
+                after_step_ctx = AfterStepCtx(
+                    session_key=session_key,
+                    channel=channel,
+                    chat_id=chat_id,
+                    iteration=iteration,
+                    tools_called=tuple(),
+                    partial_reply=partial_reply,
+                    tools_used_so_far=tuple(tools_used_so_far),
+                    has_more=False,
+                )
+                await self.event_bus.fanout(after_step_ctx)
                 break
 
         if not final_response:
             final_response = "喵... 番茄猫卡住了，请再说一次？(・_・;)"
 
-        media_paths: list[Path] = []
+        after_reasoning_ctx = AfterReasoningCtx(
+            session_key=session_key,
+            channel=channel,
+            chat_id=chat_id,
+            tools_used=tuple(tools_used_so_far),
+            thinking=final_thinking.strip(),
+            reply=final_response,
+        )
+        after_reasoning_ctx = await self.event_bus.emit(after_reasoning_ctx)
+        final_response = after_reasoning_ctx.reply
+        final_thinking = after_reasoning_ctx.thinking or final_thinking
+
+        media_paths_list: list[Path] = []
         if self.meme_service and final_response:
             try:
                 meme_result = self.meme_service.decorate_reply(final_response)
                 final_response = meme_result.text
-                media_paths = meme_result.media_paths
-                if media_paths:
-                    logger.info(f"[meme] 匹配到 {len(media_paths)} 个媒体")
+                media_paths_list = meme_result.media_paths
+                if media_paths_list:
+                    logger.info(f"[meme] 匹配到 {len(media_paths_list)} 个媒体")
             except Exception as e:
                 logger.warning(f"[meme] 处理失败: {e}")
 
@@ -454,11 +582,22 @@ class TomatoCatAgent:
 
             asyncio.create_task(self._post_conversation_memory(text, final_response))
 
+        after_turn_ctx = AfterTurnCtx(
+            session_key=session_key,
+            channel=channel,
+            chat_id=chat_id,
+            reply=final_response,
+            tools_used=tuple(tools_used_so_far),
+            thinking=final_thinking.strip(),
+            will_dispatch=True,
+        )
+        self.event_bus.enqueue(after_turn_ctx)
+
         await self.event_bus.emit(TurnEndEvent(session_key, final_response))
 
         return {
             "text": final_response,
-            "media_paths": media_paths,
+            "media_paths": media_paths_list,
             "thinking": final_thinking.strip(),
             "tool_calls": all_tool_calls,
         }
@@ -476,7 +615,7 @@ class TomatoCatAgent:
 
             if self.memory.tick_conversation():
                 logger.info("[agent] 对话轮次达到阈值，触发记忆整合")
-                await self.memory.consolidate(self._fast_llm.simple_chat)
+                await self.memory.consolidate()
         except Exception as e:
             logger.warning(f"[agent] 对话后记忆处理失败: {e}")
 

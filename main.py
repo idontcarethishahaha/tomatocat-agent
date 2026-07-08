@@ -47,8 +47,8 @@ async def serve(config_path: Path, workspace: Path) -> dict:
     from tomatocat.channels.cli_socket import CLISocketChannel
     from tomatocat.channels.telegram import TelegramChannel
     from tomatocat.channels.qq import QQChannel
-    from tomatocat.embedding import EmbeddingService
-    from tomatocat.memory import MemoryEngine
+    from tomatocat.checkpoint import CheckpointManager
+    from tomatocat.plugins.default_memory.plugin import DefaultMemoryPlugin, MemoryPluginBuildDeps
     from tomatocat.mcp_client import MCPClient
     from tomatocat.meme import MemeService
     from tomatocat.proactive.engine import ProactiveEngine
@@ -65,24 +65,29 @@ async def serve(config_path: Path, workspace: Path) -> dict:
     event_bus = EventBus()
     session_manager = SessionManager(workspace=workspace)
 
-    embedding = None
-    if config.memory.vector_enabled and config.llm_embedding.model:
-        try:
-            embedding = EmbeddingService(
-                api_key=config.llm_embedding.api_key,
-                base_url=config.llm_embedding.base_url,
-                model=config.llm_embedding.model,
-            )
-            logger.info(f"嵌入服务已启用: {config.llm_embedding.model}")
-        except Exception as e:
-            logger.warning(f"嵌入服务初始化失败: {e}")
+    checkpoint_manager = CheckpointManager(workspace=workspace)
+    logger.info("检查点管理器已就绪")
 
-    memory = MemoryEngine(
-        workspace=workspace,
-        embedding=embedding,
-        vector_enabled=config.memory.vector_enabled and embedding is not None,
+    llm_provider = None
+    from tomatocat.agent.llm import LLMProvider
+    if config.llm_main.model:
+        llm_provider = LLMProvider(
+            model=config.llm_main.model,
+            api_key=config.llm_main.api_key,
+            base_url=config.llm_main.base_url,
+        )
+
+    memory_plugin = DefaultMemoryPlugin()
+    memory_runtime = memory_plugin.build(
+        MemoryPluginBuildDeps(
+            workspace=workspace,
+            config=config,
+            llm_provider=llm_provider or _create_dummy_llm(config),
+            event_bus=event_bus,
+        )
     )
-    logger.info("记忆系统已就绪")
+    memory = memory_runtime.engine
+    logger.info(f"记忆系统已就绪: {memory.describe().name}")
 
     mcp_client = MCPClient(
         workspace=workspace,
@@ -111,6 +116,10 @@ async def serve(config_path: Path, workspace: Path) -> dict:
         plugin_manager.register_mcp_tools(mcp_client)
         logger.info(f"插件加载完成: {len(plugin_manager._tools)} 个工具")
 
+    from tomatocat.agent.skills import SkillsLoader
+    skills_loader = SkillsLoader(workspace=workspace)
+    logger.info(f"技能加载器已就绪，{len(skills_loader.list_skills())} 个技能可用")
+
     agent = TomatoCatAgent(
         config=config,
         workspace=workspace,
@@ -119,12 +128,13 @@ async def serve(config_path: Path, workspace: Path) -> dict:
         plugin_manager=plugin_manager,
         memory=memory,
         meme_service=meme_service,
+        skills_loader=skills_loader,
     )
 
-    if memory and memory.should_consolidate():
+    if memory:
         logger.info("[memory] 检测到未整合的 PENDING 记忆，启动时自动整合...")
         try:
-            await memory.consolidate(agent._fast_llm.simple_chat)
+            await memory.consolidate()
         except Exception as e:
             logger.warning(f"[memory] 启动时整合失败: {e}")
 
@@ -209,6 +219,7 @@ async def serve(config_path: Path, workspace: Path) -> dict:
             send_fn=send_to_channel,
             agent_fn=scheduler_agent_fn,
             default_tz=config.scheduler.timezone,
+            checkpoint_manager=checkpoint_manager,
         )
         await scheduler.start()
 
@@ -221,6 +232,17 @@ async def serve(config_path: Path, workspace: Path) -> dict:
             logger.info("定时任务插件已关联，默认目标: %s:%s", default_channel, default_chat_id)
 
         logger.info("定时任务服务已启动，时区: %s", config.scheduler.timezone)
+
+    from tomatocat.dashboard_api import DashboardAPI
+    dashboard = DashboardAPI(
+        workspace=workspace,
+        memory=memory,
+        skills_loader=skills_loader,
+        scheduler=scheduler,
+        host="127.0.0.1",
+        port=8765,
+    )
+    dashboard.start()
 
     print("\n🍅🐱 番茄猫已启动喵~ (≧∇≦)ﾉ\n")
 

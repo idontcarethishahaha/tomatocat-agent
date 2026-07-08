@@ -7,6 +7,7 @@ scheduler.py 实现，支持：
 - LatencyTracker P90 延迟追踪（soft 模式提前触发）
 - cron 表达式支持
 - JSON 持久化与重启恢复
+- Checkpoint 机制：任务执行前保存检查点，失败后可恢复重试
 """
 
 from __future__ import annotations
@@ -28,6 +29,8 @@ try:
     from zoneinfo import ZoneInfo
 except ImportError:
     ZoneInfo = None  # type: ignore
+
+from .checkpoint import CheckpointManager
 
 logger = logging.getLogger(__name__)
 
@@ -285,6 +288,7 @@ class SchedulerService:
         agent_fn: Callable[[str, str, str], Any] | None = None,
         default_tz: str = "Asia/Shanghai",  # 避免和 datetime.timezone 重名
         tracker: LatencyTracker | None = None,
+        checkpoint_manager: CheckpointManager | None = None,
     ) -> None:
         self.store_path = Path(store_path)
         self.store_path.parent.mkdir(parents=True, exist_ok=True)
@@ -292,6 +296,7 @@ class SchedulerService:
         self.agent_fn = agent_fn
         self.default_tz = default_tz  # 避免和 datetime.timezone 重名
         self.tracker = tracker or LatencyTracker()
+        self._checkpoint_manager = checkpoint_manager
         self._jobs: dict[str, ScheduledJob] = {}
         self._in_flight: set[str] = set()
         self._running = False
@@ -426,11 +431,55 @@ class SchedulerService:
                 asyncio.create_task(self._execute_and_reschedule(job))
 
     async def _execute_and_reschedule(self, job: ScheduledJob) -> None:
+        checkpoint_id = None
         try:
+            if self._checkpoint_manager:
+                checkpoint_id = self._checkpoint_manager.create(
+                    task_type="scheduler",
+                    task_id=job.id,
+                    current_goal=f"执行定时任务: {job.name or job.id[:8]}",
+                    completed=[],
+                    next_step=f"执行 {job.mode} 模式任务",
+                    metadata={
+                        "trigger": job.trigger,
+                        "mode": job.mode,
+                        "channel": job.channel,
+                        "chat_id": job.chat_id,
+                        "fire_at": job.fire_at.isoformat(),
+                    },
+                    trigger="task_start"
+                )["checkpoint_id"]
+                logger.info("[scheduler] 创建检查点: %s", checkpoint_id)
+
             await self._execute(job)
             job.run_count += 1
+
+            if self._checkpoint_manager and checkpoint_id:
+                self._checkpoint_manager.mark_completed(checkpoint_id, "任务执行成功")
+                logger.info("[scheduler] 检查点已完成: %s", checkpoint_id)
+
         except Exception as e:
             logger.error("[scheduler] 任务 %s 执行失败: %s", job.id[:8], e, exc_info=True)
+            if self._checkpoint_manager and checkpoint_id:
+                self._checkpoint_manager.create(
+                    task_type="scheduler",
+                    task_id=job.id,
+                    current_goal=f"执行定时任务: {job.name or job.id[:8]}",
+                    completed=[],
+                    next_step=f"重试执行 {job.mode} 模式任务",
+                    blocker=str(e),
+                    metadata={
+                        "trigger": job.trigger,
+                        "mode": job.mode,
+                        "channel": job.channel,
+                        "chat_id": job.chat_id,
+                        "fire_at": job.fire_at.isoformat(),
+                        "error": str(e),
+                    },
+                    trigger="task_failed"
+                )
+                logger.warning("[scheduler] 任务失败已记录到检查点")
+
         finally:
             self._in_flight.discard(job.id)
             now = datetime.now(_tz_utc.utc)

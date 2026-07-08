@@ -18,6 +18,9 @@ class EventBus:
 
     def __init__(self) -> None:
         self._handlers: dict[type[object], list[EventHandler[object]]] = {}
+        self._observe_queue: asyncio.Queue[object] | None = None
+        self._observe_task: asyncio.Task[None] | None = None
+        self._closed = False
 
     def on(self, event_type: type[E], handler: EventHandler[E]) -> None:
         handlers = self._handlers.setdefault(cast(type[object], event_type), [])
@@ -42,9 +45,18 @@ class EventBus:
             coro = self._safe_observe(event, handler)
             tasks.append(asyncio.create_task(coro))
         results = await asyncio.gather(*tasks, return_exceptions=True)
+        failed_count = 0
         for r in results:
             if isinstance(r, Exception):
+                failed_count += 1
                 logger.error("event observer error: %s", r)
+        if failed_count:
+            logger.warning(
+                "fanout completed with observer errors: event=%s failed=%d total=%d",
+                type(event).__name__,
+                failed_count,
+                len(handlers),
+            )
 
     async def _safe_observe(self, event: object, handler: EventHandler[object]) -> None:
         try:
@@ -53,6 +65,76 @@ class EventBus:
                 await result
         except Exception as e:
             logger.exception("observer error for %s: %s", type(event).__name__, e)
+
+    def enqueue(self, event: object) -> None:
+        if self._closed:
+            logger.warning("event enqueue ignored after close: %s", type(event).__name__)
+            return
+        queue = self._ensure_observe_queue()
+        queue.put_nowait(event)
+
+    async def drain(self) -> None:
+        queue = self._observe_queue
+        if queue is None:
+            return
+        self._ensure_observe_task()
+        await queue.join()
+
+    async def aclose(self) -> None:
+        await self.drain()
+        self._closed = True
+        task = self._observe_task
+        if task is None:
+            return
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+    def _ensure_observe_queue(self) -> asyncio.Queue[object]:
+        if self._observe_queue is None:
+            self._observe_queue = asyncio.Queue()
+        self._ensure_observe_task()
+        return self._observe_queue
+
+    def _ensure_observe_task(self) -> None:
+        if self._closed:
+            return
+        if self._observe_task is not None and not self._observe_task.done():
+            return
+        task = asyncio.create_task(
+            self._run_observe_queue(),
+            name="event_bus_observe_queue",
+        )
+        self._observe_task = task
+        task.add_done_callback(self._on_observe_task_done)
+
+    async def _run_observe_queue(self) -> None:
+        while True:
+            queue = self._observe_queue
+            if queue is None:
+                return
+            event = await queue.get()
+            try:
+                await self.fanout(event)
+            finally:
+                queue.task_done()
+
+    def _on_observe_task_done(self, task: asyncio.Task[None]) -> None:
+        if self._observe_task is task:
+            self._observe_task = None
+        if self._closed or task.cancelled():
+            return
+        try:
+            exc = task.exception()
+        except Exception as e:
+            logger.warning("event dispatcher inspect failed: %s", e)
+            exc = None
+        if exc is not None:
+            logger.error("event dispatcher stopped unexpectedly", exc_info=(type(exc), exc, exc.__traceback__))
+        if self._observe_queue is not None:
+            self._ensure_observe_task()
 
 
 # ── 常用事件类型 ────────────────────────────────────────────────────────────

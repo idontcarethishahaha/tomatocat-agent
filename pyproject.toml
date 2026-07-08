@@ -14,6 +14,8 @@ dependencies = [
     "websockets>=12.0",
     "PyQt6>=6.7.0",
     "PyQt6-Qt6>=6.7.0",
+    "fastapi>=0.139.0",
+    "uvicorn>=0.49.0",
 ]
 
 [project.scripts]
