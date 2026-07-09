@@ -459,10 +459,11 @@ class SubagentManager:
 
         from ...bus import InboundMessage
 
+        session_key = f"{origin_channel}:{origin_chat_id}" if origin_channel != "unknown" else origin_chat_id
         msg = InboundMessage(
-            channel=origin_channel,
-            chat_id=origin_chat_id,
+            session_key=session_key,
             text=f"[后台任务完成]\n任务：{label}\n状态：{status}\n\n{payload_result}",
+            channel=origin_channel,
         )
         msg._is_spawn_completion = True
         msg._spawn_event = event

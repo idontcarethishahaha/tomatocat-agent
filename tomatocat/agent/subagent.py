@@ -153,9 +153,7 @@ class SubAgent:
                 response = await self._provider.chat(
                     messages=_trim_tool_results(messages),
                     tools=self._tool_schemas if self._tool_schemas else None,
-                    model=self._model,
                     max_tokens=self._max_tokens,
-                    tool_choice="auto" if self._tool_schemas else None,
                 )
             except Exception as e:
                 logger.error("[subagent] LLM 调用失败 iteration=%d: %s", iteration, e)

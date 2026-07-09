@@ -49,6 +49,7 @@ class SpawnPlugin(Plugin):
     )
     async def _tool_spawn(
         self,
+        event: object,
         task: str,
         label: str = "",
         profile: str = "",
@@ -93,6 +94,7 @@ class SpawnPlugin(Plugin):
     )
     async def _tool_spawn_sync(
         self,
+        event: object,
         task: str,
         label: str = "",
         profile: str = "research",
@@ -113,7 +115,7 @@ class SpawnPlugin(Plugin):
         "list_spawns",
         description="列出当前运行中的后台子 Agent 任务",
     )
-    async def _tool_list_spawns(self, **kwargs) -> str:
+    async def _tool_list_spawns(self, event: object, **kwargs) -> str:
         mgr = self._subagent_manager
         if mgr is None:
             return "😿 后台任务管理器未启用"
@@ -134,7 +136,7 @@ class SpawnPlugin(Plugin):
         "cancel_spawn",
         description="取消一个正在运行的后台任务",
     )
-    async def _tool_cancel_spawn(self, job_id: str, **kwargs) -> str:
+    async def _tool_cancel_spawn(self, event: object, job_id: str, **kwargs) -> str:
         mgr = self._subagent_manager
         if mgr is None:
             return "😿 后台任务管理器未启用"
