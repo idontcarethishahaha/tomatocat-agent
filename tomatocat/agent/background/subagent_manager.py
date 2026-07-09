@@ -124,10 +124,12 @@ class SubagentManager:
         model: str,
         max_tokens: int,
         plugin_manager: Any = None,
+        send_fn: Any = None,
     ) -> None:
         self._workspace = workspace
         self._event_bus = event_bus
         self._plugin_manager = plugin_manager
+        self._send_fn = send_fn
         self._runtime = SubagentRuntime(
             provider=provider,
             model=model,
@@ -379,7 +381,7 @@ class SubagentManager:
         all_tools = self._plugin_manager._tools
         tools = []
 
-        research_tools = {"web_search", "web_fetch", "read_file", "list_dir"}
+        research_tools = {"web_search", "web_fetch", "read_file", "write_file", "list_dir"}
         scripting_tools = {"shell", "write_file", "read_file", "list_dir", "edit_file"}
 
         allowed_tools: set[str] = set()
@@ -406,8 +408,10 @@ class SubagentManager:
         if profile == PROFILE_RESEARCH:
             base_prompt += (
                 "\n当前模式：调研模式\n"
-                "你可以使用搜索、网页抓取、读文件等工具。\n"
-                "注意：不要执行 shell 命令，不要写文件。\n"
+                "你可以使用搜索、网页抓取、读写文件等工具。\n"
+                "注意：不要执行 shell 命令。\n"
+                "重要：调研完成后，必须把结果整理成文档写入工作目录，"
+                "使用 write_file 工具保存。不要只输出到对话中。\n"
             )
         elif profile == PROFILE_SCRIPTING:
             base_prompt += (
@@ -479,14 +483,15 @@ class SubagentManager:
             origin_chat_id,
         )
 
-        if self._event_bus:
-            handler = getattr(self._event_bus, "publish_inbound", None)
-            if callable(handler):
-                await handler(msg)
-            else:
-                enqueue = getattr(self._event_bus, "enqueue", None)
-                if callable(enqueue):
-                    enqueue(msg)
+        if self._send_fn and origin_channel != "unknown" and origin_chat_id:
+            try:
+                await self._send_fn(
+                    origin_channel,
+                    origin_chat_id,
+                    f"[后台任务完成]\n任务：{label}\n状态：{status}\n\n{payload_result}",
+                )
+            except Exception as e:
+                logger.warning("[spawn] 主动通知发送失败: %s", e)
 
 
 @dataclass

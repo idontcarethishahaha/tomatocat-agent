@@ -113,15 +113,28 @@ class PluginManager:
     def get_all_tools(self) -> list[dict[str, Any]]:
         return [get_tool_definition(info) for info in self._tools.values()]
 
-    async def execute_tool(self, tool_name: str, arguments: dict[str, Any]) -> str:
+    async def execute_tool(
+        self,
+        tool_name: str,
+        arguments: dict[str, Any],
+        *,
+        session_key: str = "",
+        channel: str = "",
+    ) -> str:
         tool_info = self._tools.get(tool_name)
         if tool_info is None:
             return f"错误：未找到工具 '{tool_name}'"
 
+        call_kwargs = dict(arguments)
+        if session_key:
+            call_kwargs["_session_key"] = session_key
+        if channel:
+            call_kwargs["_channel"] = channel
+
         # MCP 工具（plugin_id="mcp"）直接调用，不需要插件实例
         if tool_info.plugin_id == "mcp":
             try:
-                result = tool_info.func(None, **arguments)
+                result = tool_info.func(None, **call_kwargs)
                 if hasattr(result, "__await__"):
                     result = await result
                 return str(result) if result is not None else ""
@@ -134,7 +147,7 @@ class PluginManager:
             return f"错误：工具 '{tool_name}' 所属插件未找到"
 
         try:
-            result = tool_info.func(plugin, None, **arguments)
+            result = tool_info.func(plugin, None, **call_kwargs)
             if hasattr(result, "__await__"):
                 result = await result
             return str(result) if result is not None else ""

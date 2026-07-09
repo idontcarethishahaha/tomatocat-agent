@@ -59,9 +59,13 @@ class SpawnPlugin(Plugin):
         if mgr is None:
             return "😿 后台任务管理器未启用"
 
-        session_key = kwargs.get("session_key", "")
-        origin_channel = kwargs.get("channel", "unknown")
-        origin_chat_id = session_key or "unknown"
+        session_key = kwargs.get("_session_key", "")
+        origin_channel = kwargs.get("_channel", "unknown")
+        # session_key 格式通常是 "channel:chat_id"，拆分开
+        if ":" in session_key:
+            origin_channel, origin_chat_id = session_key.split(":", 1)
+        else:
+            origin_chat_id = session_key or "unknown"
 
         running_count = mgr.get_running_count()
 

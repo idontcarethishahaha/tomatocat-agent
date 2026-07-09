@@ -622,7 +622,9 @@ class TomatoCatAgent:
                         await on_delta(channel, session_key, "tool_call_start", tool_info)
 
                     logger.info("[agent] 调用工具: %s(%s)", tc.name, tc.arguments)
-                    result = await self.plugin_manager.execute_tool(tc.name, tc.arguments)
+                    result = await self.plugin_manager.execute_tool(
+                        tc.name, tc.arguments, session_key=session_key, channel=channel
+                    )
                     logger.info("[agent] 工具结果: %s", result[:200] if result else "(空)")
 
                     tool_info["status"] = "done"

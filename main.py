@@ -130,6 +130,38 @@ async def serve(config_path: Path, workspace: Path) -> dict:
         memory=memory,
     )
 
+    # 先创建 channels（send_to_channel 需要它）
+    channels: list = []
+
+    if config.channels.cli.enabled:
+        host, port_str = config.channels.cli.socket.split(":")
+        cli_channel = CLISocketChannel(host=host, port=int(port_str))
+        channels.append(cli_channel)
+
+    if config.channels.telegram.enabled and config.channels.telegram.token:
+        tg_channel = TelegramChannel(
+            token=config.channels.telegram.token,
+            allow_from=config.channels.telegram.allow_from,
+            upload_dir=workspace / "uploads",
+        )
+        channels.append(tg_channel)
+
+    if config.channels.qq.enabled and config.channels.qq.bot_uin:
+        qq_channel = QQChannel(
+            bot_uin=config.channels.qq.bot_uin,
+            allow_from=config.channels.qq.allow_from,
+            groups=config.channels.qq.groups,
+            upload_dir=workspace / "uploads",
+        )
+        channels.append(qq_channel)
+
+    async def send_to_channel(channel_name: str, chat_id: str, message: str) -> None:
+        for ch in channels:
+            if ch.__class__.__name__.lower().startswith(channel_name.lower()):
+                if hasattr(ch, "send_message"):
+                    await ch.send_message(chat_id, message)
+                return
+
     subagent_manager = None
     if llm_provider and config.llm_fast.model:
         from tomatocat.agent.background.subagent_manager import SubagentManager
@@ -147,6 +179,7 @@ async def serve(config_path: Path, workspace: Path) -> dict:
             model=config.llm_fast.model,
             max_tokens=8192,
             plugin_manager=plugin_manager,
+            send_fn=send_to_channel,
         )
         plugin_manager.context["subagent_manager"] = subagent_manager
         logger.info("子 Agent 管理器已就绪")
@@ -186,30 +219,6 @@ async def serve(config_path: Path, workspace: Path) -> dict:
                 logger.warning(f"[memory] 启动时整合失败: {e}")
         asyncio.create_task(_safe_consolidate(), name="memory_consolidate")
 
-    channels: list = []
-
-    if config.channels.cli.enabled:
-        host, port_str = config.channels.cli.socket.split(":")
-        cli_channel = CLISocketChannel(host=host, port=int(port_str))
-        channels.append(cli_channel)
-
-    if config.channels.telegram.enabled and config.channels.telegram.token:
-        tg_channel = TelegramChannel(
-            token=config.channels.telegram.token,
-            allow_from=config.channels.telegram.allow_from,
-            upload_dir=workspace / "uploads",
-        )
-        channels.append(tg_channel)
-
-    if config.channels.qq.enabled and config.channels.qq.bot_uin:
-        qq_channel = QQChannel(
-            bot_uin=config.channels.qq.bot_uin,
-            allow_from=config.channels.qq.allow_from,
-            groups=config.channels.qq.groups,
-            upload_dir=workspace / "uploads",
-        )
-        channels.append(qq_channel)
-
     async def message_handler(session_key: str, text: str, channel: str, **kwargs) -> dict:
         return await agent.handle_message(session_key, text, channel, **kwargs)
 
@@ -223,13 +232,6 @@ async def serve(config_path: Path, workspace: Path) -> dict:
         except Exception as e:
             logger.error("[channel] %s 启动失败: %s（该渠道不可用，其他渠道不受影响）",
                          ch.__class__.__name__, e)
-
-    async def send_to_channel(channel_name: str, chat_id: str, message: str) -> None:
-        for ch in channels:
-            if ch.__class__.__name__.lower().startswith(channel_name.lower()):
-                if hasattr(ch, "send_message"):
-                    await ch.send_message(chat_id, message)
-                return
 
     proactive = None
     if config.proactive.enabled and config.mcp.enabled:
