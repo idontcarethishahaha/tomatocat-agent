@@ -177,11 +177,14 @@ async def serve(config_path: Path, workspace: Path) -> dict:
     )
 
     if memory:
-        logger.info("[memory] 检测到未整合的 PENDING 记忆，启动时自动整合...")
-        try:
-            await memory.consolidate()
-        except Exception as e:
-            logger.warning(f"[memory] 启动时整合失败: {e}")
+        logger.info("[memory] 检测到未整合的 PENDING 记忆，启动时整合...")
+        # 不阻塞启动流程，异步执行记忆整合
+        async def _safe_consolidate():
+            try:
+                await memory.consolidate()
+            except Exception as e:
+                logger.warning(f"[memory] 启动时整合失败: {e}")
+        asyncio.create_task(_safe_consolidate(), name="memory_consolidate")
 
     channels: list = []
 
@@ -214,7 +217,12 @@ async def serve(config_path: Path, workspace: Path) -> dict:
         ch.set_handler(message_handler)
 
     for ch in channels:
-        await ch.start()
+        try:
+            await ch.start()
+            logger.info("[channel] %s 已启动", ch.__class__.__name__)
+        except Exception as e:
+            logger.error("[channel] %s 启动失败: %s（该渠道不可用，其他渠道不受影响）",
+                         ch.__class__.__name__, e)
 
     async def send_to_channel(channel_name: str, chat_id: str, message: str) -> None:
         for ch in channels:
@@ -372,16 +380,29 @@ def _run_desktop(config_path: Path, workspace: Path) -> None:
         agent_loop = loop
         try:
             loop.run_until_complete(_run())
-        except Exception as e:
-            logger.error(f"Agent 线程异常: {e}", exc_info=True)
+        except BaseException as e:
+            import traceback
+            tb = traceback.format_exc()
+            print(f"[Agent 线程崩溃] {e}\n{tb}", flush=True)
+            logger.error(f"Agent 线程异常: {e}\n{tb}")
+            for h in logging.getLogger().handlers:
+                try:
+                    h.flush()
+                except Exception:
+                    pass
             agent_ready.set()
 
     agent_thread = threading.Thread(target=_agent_thread, daemon=True)
     agent_thread.start()
 
-    agent_ready.wait(timeout=30)
+    agent_ready.wait(timeout=60)
     if not agent_ready.is_set() or not agent_context:
         print("❌ Agent 启动失败，请检查日志")
+        # 打印已有的 agent_context 信息帮助诊断
+        if agent_context:
+            print(f"   agent_context 有内容但可能不完整: {list(agent_context.keys())}")
+        else:
+            print("   agent_context 为空，serve() 可能崩溃了")
         return
 
     from PyQt6.QtWidgets import QApplication, QMessageBox

@@ -83,6 +83,9 @@ def _derive_params_schema(func: Callable[..., Any]) -> dict[str, Any]:
         if pname in ("self", "event", "cls"):
             continue
 
+        if param.kind == inspect.Parameter.VAR_KEYWORD:
+            continue
+
         ann = param.annotation
         type_name = getattr(ann, "__name__", "string")
         json_type = _PY_TO_JSON.get(type_name, "string")

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import re
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable
@@ -12,6 +13,29 @@ from typing import Any, Awaitable, Callable
 from openai import AsyncOpenAI
 
 logger = logging.getLogger(__name__)
+
+# 国内 API 域名直连，不走代理
+_DOMESTIC_API_HOSTS = {"open.bigmodel.cn", "api.minimax.chat", "dashscope.aliyuncs.com"}
+
+
+def _should_bypass_proxy(base_url: str) -> bool:
+    """判断 base_url 是否为国内 API，应该直连不走代理"""
+    if not base_url:
+        return False
+    try:
+        from urllib.parse import urlparse
+        host = urlparse(base_url).hostname or ""
+        return any(h in host for h in _DOMESTIC_API_HOSTS)
+    except Exception:
+        return False
+
+
+def _clean_proxy_env() -> None:
+    """如果环境变量中设了代理，清除掉以免影响国内 API 连接"""
+    for key in ("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"):
+        val = os.environ.get(key, "")
+        if val:
+            logger.info("[llm] 检测到代理环境变量 %s=%s，将使用 httpx 直连国内 API", key, val)
 
 _StreamDelta = dict[str, str]
 
@@ -48,9 +72,23 @@ class LLMProvider:
         self.enable_thinking = enable_thinking
         self._valid = bool(api_key and api_key.strip() and api_key != "placeholder")
 
-        client_kwargs: dict[str, Any] = {"api_key": self.api_key}
+        client_kwargs: dict[str, Any] = {
+            "api_key": self.api_key,
+            "timeout": 120.0,        # 请求超时 120 秒
+            "max_retries": 2,         # 最多重试 2 次
+        }
         if base_url:
             client_kwargs["base_url"] = base_url
+
+        # 国内 API 直连，绕过代理
+        if _should_bypass_proxy(base_url):
+            import httpx
+            client_kwargs["http_client"] = httpx.AsyncClient(
+                proxy=None,
+                timeout=httpx.Timeout(120.0, connect=30.0),
+            )
+            logger.info("[llm] %s 为国内 API，已绕过代理直连", base_url)
+
         self._client = AsyncOpenAI(**client_kwargs)
 
     def _check_valid(self) -> None:
