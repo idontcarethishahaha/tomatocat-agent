@@ -169,7 +169,17 @@ class SubAgent:
                 {
                     "role": "assistant",
                     "content": response.content or "",
-                    "tool_calls": [tc.model_dump() for tc in response.tool_calls],
+                    "tool_calls": [
+                        {
+                            "id": tc.id,
+                            "type": "function",
+                            "function": {
+                                "name": tc.name,
+                                "arguments": tc.arguments if isinstance(tc.arguments, str) else __import__("json").dumps(tc.arguments, ensure_ascii=False),
+                            },
+                        }
+                        for tc in response.tool_calls
+                    ],
                 }
             )
 

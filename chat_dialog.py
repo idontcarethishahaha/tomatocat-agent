@@ -94,7 +94,7 @@ QPushButton#SendBtn:pressed {{ background: {t['btn_pressed']}; }}
 
 class ChatBubble(QWidget):
     closed = pyqtSignal()
-    _result_signal = pyqtSignal(str)
+    _result_signal = pyqtSignal(dict)
     _error_signal = pyqtSignal(str)
 
     def __init__(self, parent=None, agent_context=None, agent_loop=None):
@@ -250,7 +250,7 @@ class ChatBubble(QWidget):
                 result = await self.agent_context["agent"].handle_message(
                     "desktop_chat", user_text, "desktop"
                 )
-                return result.get("text", "")
+                return result
 
             future = asyncio.run_coroutine_threadsafe(_agent_call(), self.agent_loop)
             result = future.result(timeout=120)
@@ -258,7 +258,10 @@ class ChatBubble(QWidget):
         except Exception as e:
             self._error_signal.emit(str(e))
 
-    def _on_result(self, text):
+    def _on_result(self, result):
+        text = result.get("text", "")
+        media_paths = result.get("media_paths", [])
+
         cursor = self.history_view.textCursor()
         cursor.movePosition(cursor.MoveOperation.End)
         cursor.select(cursor.SelectionType.BlockUnderCursor)
@@ -266,6 +269,22 @@ class ChatBubble(QWidget):
         self.history_view.setTextCursor(cursor)
 
         self._append_text("🐾 番茄猫", self._theme["assistant_color"], text)
+
+        for media_path in media_paths:
+            try:
+                media_str = str(media_path)
+                if media_str.lower().endswith(".gif"):
+                    from PyQt6.QtCore import QUrl
+                    from PyQt6.QtGui import QTextDocument
+                    gif_html = f'<img src="{QUrl.fromLocalFile(media_str).toString()}" style="max-height: 150px;"/>'
+                    self.history_view.append(gif_html)
+                else:
+                    from PyQt6.QtCore import QUrl
+                    img_html = f'<img src="{QUrl.fromLocalFile(media_str).toString()}" style="max-height: 200px;"/>'
+                    self.history_view.append(img_html)
+            except Exception:
+                pass
+
         self._streaming = False
         self._history.append({"role": "assistant", "content": text})
         self._save_history()
