@@ -21,6 +21,7 @@ from typing import Any, Callable, Awaitable
 
 import numpy as np
 
+from .bus import MemoryWritten
 from .checkpoint import CheckpointManager
 from .embedding import EmbeddingService
 
@@ -80,6 +81,7 @@ class MemoryEngine:
         embedding: EmbeddingService | None = None,
         vector_enabled: bool = True,
         checkpoint_manager: CheckpointManager | None = None,
+        event_bus: Any = None,
     ):
         self.workspace = workspace
         self.memory_dir = workspace / "memory"
@@ -89,6 +91,7 @@ class MemoryEngine:
         self.embedding = embedding
         self.vector_enabled = vector_enabled and embedding is not None
         self._checkpoint_manager = checkpoint_manager
+        self._event_bus = event_bus
         self._items: list[MemoryItem] = []
         self._vector_store_path = self.memory_dir / "vectors.json"
         self._pending_path = self.memory_dir / "PENDING.md"
@@ -222,6 +225,19 @@ class MemoryEngine:
         self._items.append(item)
         self._save_vectors()
         log.info(f"[memory] 新增记忆: {category} - {content[:30]}...")
+
+        if self._event_bus:
+            self._event_bus.enqueue(
+                MemoryWritten(
+                    session_key="",
+                    source_ref="add_memory",
+                    action="write",
+                    memory_type=category,
+                    item_id=item_id,
+                    summary=content[:120],
+                )
+            )
+
         return item_id
 
     async def search(self, query: str, top_k: int = 5, category: str | None = None) -> list[dict[str, Any]]:

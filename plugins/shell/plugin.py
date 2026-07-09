@@ -61,6 +61,29 @@ _BANNED_COMMANDS = frozenset(
 # 网络命令：额外 SSRF 检查
 _NETWORK_CMDS = frozenset({"curl", "wget", "http", "httpie", "xh", "powershell -c Invoke-WebRequest"})
 
+# shell_safety: 需要确认的高危命令模式
+_DANGEROUS_PATTERNS = [
+    (r"rm\s+-rf\s+[/~]", "rm -rf 根目录或家目录"),
+    (r"rm\s+-rf\s+\.", "rm -rf 当前目录"),
+    (r"rm\s+-rf\s+\*", "rm -rf 通配符删除"),
+    (r">\s*/dev/null.*&&\s*rm", "管道后删除"),
+    (r"sudo\s+rm", "sudo 删除"),
+    (r"sudo\s+.*\b(fdisk|mkfs|parted)\b", "sudo 磁盘操作"),
+    (r"\bformat\b", "磁盘格式化"),
+    (r":\(\)\{\s*:\|:&\s*\};:", "Fork 炸弹"),
+    (r"bash\s+-i\s+>&\s+/dev/tcp", "反向 Shell"),
+    (r"powershell.*-enc\s+", "PowerShell 编码执行"),
+    (r"Invoke-Expression|IEX", "PowerShell 表达式执行"),
+    (r"\bcd\s+\\\s*\.\.\\", "目录遍历"),
+    (r"del\s+/[fqs].*\\\*", "强制删除"),
+]
+
+# shell_safety: 交互式命令（会导致阻塞）
+_INTERACTIVE_COMMANDS = frozenset({
+    "vim", "vi", "nano", "emacs", "less", "more", "top", "htop",
+    "python", "python3", "node", "irb", "php -a",
+})
+
 
 @dataclass
 class BackgroundTask:
@@ -385,15 +408,43 @@ class ShellPlugin(Plugin):
             log.info("[shell] 后台任务已清理: %s", task_id)
 
 
+import re
+
+
 def _check_banned(command: str) -> str | None:
-    """检查命令是否在黑名单中"""
+    """检查命令是否在黑名单中（shell_safety 增强版）"""
     cmd_lower = command.lower().strip()
 
-    # 提取第一个命令词
-    first_token = cmd_lower.split()[0] if cmd_lower.split() else ""
+    if not cmd_lower:
+        return "命令不能为空"
 
+    # 1. 黑名单检查
     for banned in _BANNED_COMMANDS:
         if banned in cmd_lower:
             return f"命令 '{banned}' 被禁止使用"
+
+    # 2. shell_safety: 高危模式检查
+    for pattern, desc in _DANGEROUS_PATTERNS:
+        if re.search(pattern, cmd_lower, re.IGNORECASE):
+            return f"检测到高危操作: {desc}，已阻止执行"
+
+    # 3. shell_safety: 交互式命令检查
+    first_token = cmd_lower.split()[0] if cmd_lower.split() else ""
+    if first_token in _INTERACTIVE_COMMANDS:
+        return f"交互式命令 '{first_token}' 会导致阻塞，请使用非交互式方式（如 `cat file` 替代 `less file`）"
+
+    # 4. shell_safety: sudo 检查（非完全禁止，但提醒）
+    if cmd_lower.startswith("sudo "):
+        # 检查是否是危险的 sudo 操作
+        dangerous_sudo = ["rm", "dd", "mkfs", "fdisk", "parted", "chown -R /"]
+        for d in dangerous_sudo:
+            if d in cmd_lower:
+                return f"sudo {d} 是高风险操作，已阻止"
+
+    # 5. shell_safety: 检查 rm 是否带有 -f 且目标是重要目录
+    if re.search(r"\brm\b", cmd_lower):
+        # 检查是否删除当前工作区外的文件
+        if ".." in cmd_lower or "~" in cmd_lower:
+            return "禁止删除工作区外的文件（包含 .. 或 ~）"
 
     return None

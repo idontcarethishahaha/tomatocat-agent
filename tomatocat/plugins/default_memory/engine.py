@@ -37,10 +37,11 @@ class DefaultMemoryEngine(MemoryEngine):
         ]),
     )
 
-    def __init__(self, workspace: Path, config: Any, llm_provider: Any) -> None:
+    def __init__(self, workspace: Path, config: Any, llm_provider: Any, event_bus: Any = None) -> None:
         self._workspace = workspace
         self._config = config
         self._llm_provider = llm_provider
+        self._event_bus = event_bus
         self._init_stores()
 
     def _init_stores(self) -> None:
@@ -86,6 +87,19 @@ class DefaultMemoryEngine(MemoryEngine):
                 source_ref=request.hints.get("source_ref", ""),
             )
 
+            if self._event_bus:
+                from tomatocat.bus import MemoryWritten
+                self._event_bus.enqueue(
+                    MemoryWritten(
+                        session_key="",
+                        source_ref=request.hints.get("source_ref", "ingest"),
+                        action="write",
+                        memory_type=str(memory_type),
+                        item_id=item_id,
+                        summary=summary,
+                    )
+                )
+
             return MemoryIngestResult(
                 accepted=True,
                 created_ids=[item_id],
@@ -119,6 +133,25 @@ class DefaultMemoryEngine(MemoryEngine):
 
             inject_block = self._retriever.build_inject_block(hits)
 
+            if self._event_bus:
+                from tomatocat.bus import RetrievalCompleted
+                self._event_bus.enqueue(
+                    RetrievalCompleted(
+                        session_key=request.scope.session_key,
+                        query=request.text,
+                        hits=[
+                            {
+                                "id": hit.item.id,
+                                "category": hit.item.memory_type,
+                                "similarity": hit.score,
+                                "content": hit.item.summary,
+                            }
+                            for hit in hits
+                        ],
+                        injected_count=len(hits),
+                    )
+                )
+
             return MemoryQueryResult(
                 text_block=inject_block,
                 records=records,
@@ -126,6 +159,16 @@ class DefaultMemoryEngine(MemoryEngine):
             )
         except Exception as e:
             logger.error("[memory] query 失败: %s", e)
+            if self._event_bus:
+                from tomatocat.bus import RetrievalCompleted
+                self._event_bus.enqueue(
+                    RetrievalCompleted(
+                        session_key=request.scope.session_key,
+                        query=request.text,
+                        hits=[],
+                        error=str(e),
+                    )
+                )
             return MemoryQueryResult(trace={"error": str(e)})
 
     async def mutate(self, request: MemoryMutation) -> MemoryMutationResult:

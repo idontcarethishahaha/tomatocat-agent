@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, Awaitable, Callable
 
 from ..config import Config
-from ..bus import EventBus, InboundMessage, OutboundMessage, TurnStartEvent, TurnEndEvent
+from ..bus import EventBus, InboundMessage, OutboundMessage, TurnStartEvent, TurnEndEvent, TurnCommitted, RetrievalCompleted
 from ..session import SessionManager
 from ..plugins.manager import PluginManager
 from ..lifecycle import (
@@ -270,6 +270,73 @@ class TomatoCatAgent:
 
         self._system_prompt = config.agent.system_prompt
 
+        # ===== 安全防护插件 =====
+        # tool_loop_guard: 工具循环防护
+        self._tool_call_history: dict[str, list[dict[str, Any]]] = {}
+        self._tool_loop_threshold = 3
+
+        # context_pressure: 上下文压力管理
+        self._context_token_limit = 12000  # Token 上限阈值
+        self._context_warning_threshold = 8000  # 警告阈值
+
+    def _check_tool_loop(self, session_key: str, tool_name: str, arguments: Any) -> tuple[bool, str]:
+        """tool_loop_guard: 检测连续重复调用相同工具+参数
+
+        Returns:
+            (是否检测到循环, 错误信息)
+        """
+        history = self._tool_call_history.setdefault(session_key, [])
+
+        # 记录本次调用
+        call_sig = {"tool": tool_name, "args": str(arguments)}
+        history.append(call_sig)
+
+        # 只保留最近 10 次调用
+        if len(history) > 10:
+            history.pop(0)
+
+        # 检查最近 N 次是否都是相同的工具+参数
+        if len(history) >= self._tool_loop_threshold:
+            recent = history[-self._tool_loop_threshold:]
+            first = recent[0]
+            if all(r["tool"] == first["tool"] and r["args"] == first["args"] for r in recent):
+                return True, f"连续 {self._tool_loop_threshold} 次调用相同工具 `{tool_name}` 且参数相同"
+
+        # 检查是否连续调用同一个工具（即使参数不同）
+        if len(history) >= self._tool_loop_threshold + 2:
+            recent = history[-(self._tool_loop_threshold + 2):]
+            tool_names = [r["tool"] for r in recent]
+            if len(set(tool_names)) == 1:
+                return True, f"连续 {len(recent)} 次调用工具 `{tool_name}`，疑似陷入循环"
+
+        return False, ""
+
+    async def _check_tool_safety(self, tool_name: str, arguments: Any) -> tuple[bool, str]:
+        """shell_safety: 检查工具调用是否安全
+
+        Returns:
+            (是否允许执行, 拒绝原因)
+        """
+        if tool_name != "shell":
+            return True, ""
+
+        command = str(arguments.get("command") or "").strip()
+        if not command:
+            return True, ""
+
+        from plugins.shell_safety.plugin import ShellSafetyPlugin
+
+        safety_plugin = ShellSafetyPlugin()
+        allowed, reason = await safety_plugin.on_tool_pre(tool_name, arguments)
+        return allowed, reason
+
+    def _estimate_tokens(self, text: str) -> int:
+        """估算文本的 Token 数（粗略估计：中文字符 ≈ 1 token，英文 ≈ 0.25 token）"""
+        import re
+        cn_chars = len(re.findall(r'[\u4e00-\u9fff]', text))
+        other_chars = len(text) - cn_chars
+        return int(cn_chars + other_chars * 0.25)
+
     def _build_system_with_memory(self) -> str:
         prompt = self._system_prompt
         if self.memory:
@@ -280,6 +347,22 @@ class TomatoCatAgent:
                     logger.debug("[agent] 记忆上下文已注入")
             except Exception as e:
                 logger.warning(f"[agent] 记忆上下文获取失败: {e}")
+
+        # context_pressure: 检查上下文 Token 压力
+        token_count = self._estimate_tokens(prompt)
+        if token_count > self._context_token_limit:
+            logger.warning(
+                "[context_pressure] 系统提示词 Token 超限: %d > %d，将截断记忆内容",
+                token_count, self._context_token_limit,
+            )
+            # 截断：保留基础提示词，去掉记忆部分
+            prompt = self._system_prompt
+            logger.info("[context_pressure] 已截断记忆注入，当前 Token: %d", self._estimate_tokens(prompt))
+        elif token_count > self._context_warning_threshold:
+            logger.info(
+                "[context_pressure] 系统提示词接近上限: %d / %d Token",
+                token_count, self._context_token_limit,
+            )
 
         if self.skills_loader:
             try:
@@ -372,8 +455,23 @@ class TomatoCatAgent:
                     mem_text = "\n".join(f"- {r['content'][:80]}" for r in related)
                     retrieved_memory_block = mem_text
                     logger.info(f"[agent] 找到 {len(related)} 条相关记忆")
-            except Exception:
-                pass
+                self.event_bus.enqueue(
+                    RetrievalCompleted(
+                        session_key=session_key,
+                        query=text,
+                        hits=related,
+                        injected_count=len(related),
+                    )
+                )
+            except Exception as e:
+                self.event_bus.enqueue(
+                    RetrievalCompleted(
+                        session_key=session_key,
+                        query=text,
+                        hits=[],
+                        error=str(e),
+                    )
+                )
 
         time_envelope = build_message_time_envelope(
             message_time,
@@ -499,6 +597,24 @@ class TomatoCatAgent:
                 tools_used_so_far.extend(tool_names)
 
                 for tc in response.tool_calls:
+                    # tool_loop_guard: 检测工具循环
+                    loop_detected, loop_msg = self._check_tool_loop(session_key, tc.name, tc.arguments)
+                    if loop_detected:
+                        logger.warning("[tool_loop_guard] %s", loop_msg)
+                        result = f"[tool_loop_guard] {loop_msg} 请尝试其他方法或向用户说明情况。"
+                        session.add_tool_result(tc.id, tc.name, result)
+                        final_response = "喵... 我好像陷入了循环，换个方式试试？"
+                        break
+
+                    # shell_safety: 检查危险命令
+                    safety_allowed, safety_reason = await self._check_tool_safety(tc.name, tc.arguments)
+                    if not safety_allowed:
+                        logger.warning("[shell_safety] %s", safety_reason)
+                        result = f"[shell_safety] {safety_reason}"
+                        session.add_tool_result(tc.id, tc.name, result)
+                        final_response = "喵... 这个命令不安全，我不能执行哦~"
+                        break
+
                     tool_info = {"name": tc.name, "status": "running"}
                     all_tool_calls.append(tool_info)
 
@@ -594,6 +710,16 @@ class TomatoCatAgent:
         self.event_bus.enqueue(after_turn_ctx)
 
         await self.event_bus.emit(TurnEndEvent(session_key, final_response))
+
+        self.event_bus.enqueue(
+            TurnCommitted(
+                session_key=session_key,
+                input_message=text,
+                assistant_response=final_response,
+                tools_used=tools_used_so_far,
+                thinking=final_thinking.strip(),
+            )
+        )
 
         return {
             "text": final_response,

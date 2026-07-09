@@ -24,17 +24,36 @@ PLUGINS_DIR = ROOT / "plugins"
 
 sys.path.insert(0, str(ROOT))
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s  %(levelname)-8s  %(name)s  %(message)s",
-    datefmt="%H:%M:%S",
-    stream=sys.stdout,
-    force=True,
-)
-logging.getLogger("httpx").setLevel(logging.WARNING)
-logging.getLogger("telegram").setLevel(logging.WARNING)
-logging.getLogger("chromadb").setLevel(logging.WARNING)
+_LOG_FORMAT = "%(asctime)s  %(levelname)-8s  %(name)s  %(message)s"
+_LOG_DATEFMT = "%H:%M:%S"
 
+def _setup_logging(workspace: Path | None = None) -> None:
+    """配置日志：输出到控制台 + 工作区日志文件"""
+    handlers: list[logging.Handler] = [logging.StreamHandler(sys.stdout)]
+
+    if workspace is not None:
+        log_dir = workspace / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        file_handler = logging.FileHandler(
+            log_dir / "bot.log",
+            encoding="utf-8",
+        )
+        file_handler.setFormatter(logging.Formatter(_LOG_FORMAT, datefmt=_LOG_DATEFMT))
+        handlers.append(file_handler)
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format=_LOG_FORMAT,
+        datefmt=_LOG_DATEFMT,
+        handlers=handlers,
+        force=True,
+    )
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("telegram").setLevel(logging.WARNING)
+    logging.getLogger("chromadb").setLevel(logging.WARNING)
+
+
+_setup_logging()
 logger = logging.getLogger("tomatocat")
 
 
@@ -110,6 +129,32 @@ async def serve(config_path: Path, workspace: Path) -> dict:
         session_manager=session_manager,
         memory=memory,
     )
+
+    subagent_manager = None
+    if llm_provider and config.llm_fast.model:
+        from tomatocat.agent.background.subagent_manager import SubagentManager
+        from tomatocat.agent.policies.delegation import DelegationPolicyPlugin
+
+        fast_provider = LLMProvider(
+            model=config.llm_fast.model,
+            api_key=config.llm_fast.api_key,
+            base_url=config.llm_fast.base_url,
+        )
+        subagent_manager = SubagentManager(
+            provider=fast_provider,
+            workspace=workspace,
+            event_bus=event_bus,
+            model=config.llm_fast.model,
+            max_tokens=8192,
+            plugin_manager=plugin_manager,
+        )
+        plugin_manager.context["subagent_manager"] = subagent_manager
+        logger.info("子 Agent 管理器已就绪")
+
+        delegation_policy = DelegationPolicyPlugin()
+        plugin_manager.context["delegation_policy"] = delegation_policy
+        logger.info("策略委托系统已就绪")
+
     await plugin_manager.load_all()
 
     if config.mcp.enabled:
@@ -509,6 +554,11 @@ def main() -> None:
         config_path = Path(config_value)
     if workspace_value:
         workspace = Path(workspace_value)
+
+    # 重新配置日志，输出到工作区
+    _setup_logging(workspace)
+    log_file = workspace / "logs" / "bot.log"
+    logger.info("日志已配置，输出到: %s", log_file)
 
     if _has_flag(args, "--desktop"):
         _run_desktop(config_path, workspace)

@@ -166,3 +166,65 @@ class TurnEndEvent:
     def __init__(self, session_key: str, response: str) -> None:
         self.session_key = session_key
         self.response = response
+
+
+class TurnCommitted:
+    """一轮对话提交完成（包含详细的对话信息）"""
+    def __init__(
+        self,
+        session_key: str,
+        input_message: str,
+        assistant_response: str,
+        tools_used: list[str],
+        thinking: str | None = None,
+        meme_tag: str | None = None,
+    ) -> None:
+        self.session_key = session_key
+        self.input_message = input_message
+        self.assistant_response = assistant_response
+        self.tools_used = tools_used
+        self.thinking = thinking
+        self.meme_tag = meme_tag
+
+
+class RetrievalCompleted:
+    """记忆检索完成事件"""
+    def __init__(
+        self,
+        session_key: str,
+        query: str,
+        hits: list[dict],
+        injected_count: int = 0,
+        error: str | None = None,
+    ) -> None:
+        self.session_key = session_key
+        self.query = query
+        self.orig_query = query
+        self.aux_queries = []
+        self.hits = hits
+        self.injected_count = injected_count
+        self.route_decision = None
+        self.error = error
+
+
+class MemoryWritten:
+    """记忆写入事件"""
+    def __init__(
+        self,
+        session_key: str,
+        source_ref: str,
+        action: str,
+        memory_type: str | None = None,
+        item_id: str | None = None,
+        summary: str | None = None,
+        superseded_ids: list[str] = None,
+        error: str | None = None,
+    ) -> None:
+        self.session_key = session_key
+        self.source_ref = source_ref
+        self.action = action
+        self.memory_type = memory_type
+        self.item_id = item_id
+        self.summary = summary
+        self.superseded_ids = superseded_ids or []
+        self.error = error

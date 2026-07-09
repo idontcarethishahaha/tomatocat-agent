@@ -41,6 +41,14 @@ class PluginContext:
     def proactive(self) -> Any:
         return getattr(self._manager, "proactive", None)
 
+    @property
+    def manager(self) -> Any:
+        return self._manager
+
+    @property
+    def shared(self) -> dict[str, Any]:
+        return getattr(self._manager, "context", {})
+
 
 class Plugin(ABC):
     """所有插件的基类"""

@@ -32,6 +32,8 @@ class PluginManager:
         self.proactive = None
         self._plugins: dict[str, Plugin] = {}
         self._tools: dict[str, ToolInfo] = {}
+        # 共享 context，供插件之间共享 subagent_manager、策略等资源
+        self.context: dict[str, Any] = {}
 
     async def load_all(self) -> None:
         if not self.plugins_dir.exists():

@@ -5,7 +5,7 @@ import asyncio
 from pathlib import Path
 
 from PyQt6.QtWidgets import QWidget, QApplication, QLabel
-from PyQt6.QtCore import Qt, QTimer, QPoint, QSize
+from PyQt6.QtCore import Qt, QTimer, QPoint, QSize, pyqtSignal
 from PyQt6.QtGui import (QPainter, QColor, QMovie,
                           QDragEnterEvent, QDropEvent, QMouseEvent)
 
@@ -37,6 +37,8 @@ ANIMATION_MAP = {
 
 
 class PetWindow(QWidget):
+    _analysis_done = pyqtSignal(str)
+
     def __init__(self, agent_context=None, agent_loop=None, workspace: str = ""):
         super().__init__()
         self.agent_context = agent_context
@@ -74,6 +76,9 @@ class PetWindow(QWidget):
             self._anim_timer.start(self._anim_interval)
 
         self.sys.restore_position()
+
+        # 文件分析完成信号 → 主线程更新 UI
+        self._analysis_done.connect(self._on_analysis_done)
 
     def _setup_window(self):
         self.setWindowFlags(
@@ -311,16 +316,22 @@ class PetWindow(QWidget):
             else:
                 result = f"文件分析功能需要配置 LLM。路径: {path}"
 
-            if self._chat is None:
-                self._chat = ChatBubble(
-                    agent_context=self.agent_context,
-                    agent_loop=self.agent_loop,
-                )
-                self._chat.closed.connect(self._on_chat_closed)
-            self._chat.show_analysis(result)
-            self._chat.position_near(self.geometry())
+            # 通过信号把结果发回主线程更新 UI
+            self._analysis_done.emit(result)
         except Exception as e:
             log_error(f"File analysis failed: {e}", exc_info=True)
+            self._analysis_done.emit(f"（出错了：{e}）")
+
+    def _on_analysis_done(self, result: str):
+        """在主线程中更新 UI，显示文件分析结果"""
+        if self._chat is None:
+            self._chat = ChatBubble(
+                agent_context=self.agent_context,
+                agent_loop=self.agent_loop,
+            )
+            self._chat.closed.connect(self._on_chat_closed)
+        self._chat.show_analysis(result)
+        self._chat.position_near(self.geometry())
 
     def _open_chat(self):
         if self._chat is None:
