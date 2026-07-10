@@ -26,45 +26,8 @@ uv sync
 
 复制 `config.toml.example` 为 `config.toml`，填写你的 API Key 和渠道配置。
 
-推荐配置：glm-4.5-flash 主模型 + qwen 轻量/向量：
 
-```toml
-[llm]
-provider = "openai"
-
-[llm.main]
-model = "glm-4.5-flash"
-api_key = "sk-..."
-base_url = "https://open.bigmodel.cn/api/paas/v4"
-enable_thinking = true
-multimodal = false
-
-[llm.fast]
-model = "qwen-flash"
-api_key = "sk-..."
-base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
-
-[llm.vl]
-model = "qwen-vl-plus"
-api_key = "sk-..."
-base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
-
-[llm.embedding]
-model = "text-embedding-v3"
-api_key = "sk-..."
-base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
-
-[memory]
-enabled = true
-vector_enabled = true
-
-[channels.telegram]
-enabled = true
-token = "123456:ABC..."
-allow_from = ["your_username"]
-```
-
-**4. 设置代理（国内网络需要）**
+**4. 设置代理（可选）**
 
 ```cmd
 set HTTP_PROXY=http://127.0.0.1:7897
