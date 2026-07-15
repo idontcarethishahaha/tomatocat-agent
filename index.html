@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#fff8f0" />
+    <title>TomatoCat Agent — AI 桌面猫咪伙伴</title>
+    <meta name="description" content="TomatoCat 是一个会主动找你的 AI 桌面猫咪伙伴：多智能体协同、自研向量记忆、主动推送、桌面宠物陪伴。" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Newsreader:ital,opsz,wght@0,6..72,300..800;1,6..72,300..800&family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.7.0/style.css" />
+    <link rel="stylesheet" href="styles.css" />
+    <script>
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+    </script>
+</head>
+<body>
+    <a class="skip-link" href="#main">跳到正文</a>
+
+    <!-- 浮动装饰 -->
+    <div class="floating-bg" aria-hidden="true">
+        <div class="float-shape shape-1">🍅</div>
+        <div class="float-shape shape-2">🐱</div>
+        <div class="float-shape shape-3">💕</div>
+        <div class="float-shape shape-4">✨</div>
+        <div class="float-shape shape-5">🌸</div>
+    </div>
+
+    <!-- 导航 -->
+    <header class="site-header">
+        <div class="shell header-inner">
+            <a class="brand" href="#top" aria-label="TomatoCat 首页">
+                <span class="brand-icon">🍅</span>
+                <span>TomatoCat</span>
+            </a>
+            <nav aria-label="主导航">
+                <a href="#features">核心能力</a>
+                <a href="#flow">运行流程</a>
+                <a href="#showcase">功能展示</a>
+                <a href="#start">快速开始</a>
+            </nav>
+            <div class="header-actions">
+                <button class="theme-toggle" id="themeToggle" aria-label="切换主题">
+                    <span class="theme-icon">🌙</span>
+                </button>
+                <a class="github-link" href="https://github.com/idontcarethishahaha/tomatocat-agent" target="_blank" rel="noreferrer">
+                    GitHub <span>↗</span>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main id="main">
+        <!-- Hero -->
+        <section class="hero shell" id="top">
+            <div class="hero-copy reveal">
+                <p class="eyebrow"><i></i> AI COMPANION AGENT</p>
+                <h1>不只是工具，<br />是<em>会主动找你</em>的<br />桌面猫咪伙伴。</h1>
+                <p class="lede">
+                    TomatoCat 是一个真实可运行的个人 AI 助手：多智能体协同处理长任务、自研向量记忆系统、主动推送与定时调度、桌面宠物陪伴。它不只是被动应答，还会根据你的记忆画像主动发起对话。
+                </p>
+                <div class="actions">
+                    <a class="button button-primary" href="https://github.com/idontcarethishahaha/tomatocat-agent" target="_blank" rel="noreferrer">
+                        查看源码 <span>↗</span>
+                    </a>
+                    <a class="button button-quiet" href="#features">
+                        了解它能做什么 <span>↓</span>
+                    </a>
+                </div>
+                <div class="install-line">
+                    <span>快速启动</span>
+                    <code>uv run python main.py --desktop</code>
+                </div>
+            </div>
+            <div class="hero-visual reveal" aria-label="TomatoCat 桌面宠物动态展示">
+                <div class="glow-ring"></div>
+                <div class="orbit orbit-3">
+                    <div class="orbit-icon">📚</div>
+                </div>
+                <div class="orbit orbit-2">
+                    <div class="orbit-icon">💬</div>
+                </div>
+                <div class="orbit orbit-1">
+                    <div class="orbit-icon">🍅</div>
+                </div>
+                <div class="cat-avatar">
+                    <img src="assets/hero-cat.gif" alt="番茄猫桌面宠物动画" />
+                </div>
+            </div>
+        </section>
+
+        <!-- 宣言区 -->
+        <section class="manifesto shell split-section" id="features">
+            <div class="reveal">
+                <p class="eyebrow">BUILT FOR COMPANIONSHIP</p>
+                <h2>不是把 Agent<br />做成聊天框。</h2>
+            </div>
+            <div class="manifesto-copy reveal">
+                <p>
+                    大多数 AI 助手等着你提问。TomatoCat 选择反过来：它记得你的偏好、追踪你的学习进度、到点提醒你休息，甚至主动推送你可能感兴趣的论文。
+                </p>
+                <p>
+                    它的取舍也很明确：不追求功能最多，而是做一个有记忆、会主动、能陪伴的桌面伙伴 — 底层是完整的 Agent 运行链路，上层是可爱的猫咪交互。
+                </p>
+                <a class="inline-link" href="#flow">看看它怎么运行 <span>→</span></a>
+            </div>
+        </section>
+
+        <!-- 数据条 -->
+        <div class="shell">
+            <section class="proof-strip reveal" aria-label="TomatoCat 核心数据">
+                <div>
+                    <strong>5 层</strong>
+                    <span>记忆架构：人设 / 核心记忆<br />/ 待整合 / 历史 / 归档</span>
+                </div>
+                <div>
+                    <strong>16+</strong>
+                    <span>内置插件：记账 / 学习 / Shell<br />/ 文件 / 搜索 / 定时任务</span>
+                </div>
+                <div>
+                    <strong>4 端</strong>
+                    <span>桌面 / Telegram / QQ / CLI<br />统一消息处理链路</span>
+                </div>
+            </section>
+        </div>
+
+        <!-- 运行流程 -->
+        <section class="flow-section shell" id="flow">
+            <div class="section-head reveal">
+                <p class="eyebrow">HOW IT WORKS</p>
+                <h2>一条消息，<br />从哪里来，往哪走？</h2>
+            </div>
+            <p class="section-summary reveal">
+                TomatoCat 不把功能做成散落的按钮。它先检索记忆理解上下文，再由主 Agent 判断任务复杂度，简单问题直接回答，复杂任务委派子 Agent 异步执行。
+            </p>
+
+            <div class="flow-diagram reveal" aria-label="TomatoCat 运行流程图">
+                <div class="flow-step">
+                    <span class="flow-num">01</span>
+                    <b>用户消息接入</b>
+                    <small>桌面 / Telegram / QQ / CLI</small>
+                </div>
+                <i>↓</i>
+                <div class="flow-step">
+                    <span class="flow-num">02</span>
+                    <b>记忆检索注入</b>
+                    <small>语义 + 关键词双路召回 · RRF 融合</small>
+                </div>
+                <i>↓</i>
+                <div class="flow-step">
+                    <span class="flow-num">03</span>
+                    <b>主 Agent 决策</b>
+                    <small>工具调用 / 直接回答 / 任务委派</small>
+                </div>
+                <i>↓</i>
+                <div class="flow-step compact">
+                    <span class="flow-num">04</span>
+                    <b>子 Agent 执行</b>
+                    <small>沙箱隔离 · 异步执行 · 回调推送</small>
+                </div>
+                <i>↻</i>
+                <div class="flow-step">
+                    <span class="flow-num">05</span>
+                    <b>主动推送</b>
+                    <small>定时调度 · 记忆画像 · 相关性评分</small>
+                </div>
+            </div>
+        </section>
+
+        <!-- 核心能力 -->
+        <section class="capabilities">
+            <div class="shell">
+                <article class="capability capability-memory reveal">
+                    <div class="capability-number">01</div>
+                    <div class="capability-copy">
+                        <p class="eyebrow">MEMORY &amp; RAG · 自研向量记忆</p>
+                        <h3>五层记忆体系，<br />记住真正重要的事。</h3>
+                        <p>
+                            SQLite + numpy 实现轻量向量存储，语义检索 + 关键词双路召回，RRF 排名融合。记忆强化计数让重要信息长期留存，每 8 轮对话自动异步整合短期记忆。
+                        </p>
+                    </div>
+                    <div class="capability-visual" aria-hidden="true">
+                        <div class="memory-layers">
+                            <div class="layer layer-1"><span>SELF 人设</span></div>
+                            <div class="layer layer-2"><span>MEMORY 核心记忆</span></div>
+                            <div class="layer layer-3"><span>PENDING 待整合</span></div>
+                            <div class="layer layer-4"><span>HISTORY 历史</span></div>
+                            <div class="layer layer-5"><span>JOURNAL 归档</span></div>
+                        </div>
+                    </div>
+                </article>
+
+                <article class="capability capability-agent reveal">
+                    <div class="capability-number">02</div>
+                    <div class="capability-copy">
+                        <p class="eyebrow">MULTI-AGENT · 多智能体协同</p>
+                        <h3>简单问题直接答，<br />复杂任务交出去。</h3>
+                        <p>
+                            主 Agent 即时对话，子 Agent 异步执行调研、批量处理等耗时任务。沙箱目录隔离 + Profile 权限分级，完成后主动推送结果，不打扰当前对话。
+                        </p>
+                    </div>
+                    <div class="capability-visual" aria-hidden="true">
+                        <div class="agent-diagram">
+                            <div class="agent-main">
+                                <span>主 Agent</span>
+                                <small>对话 · 决策 · 工具编排</small>
+                            </div>
+                            <div class="agent-arrows">
+                                <span>→</span><span>→</span><span>→</span>
+                            </div>
+                            <div class="agent-sub-list">
+                                <div class="agent-sub"><b>Research</b><small>搜索 · 调研</small></div>
+                                <div class="agent-sub"><b>Scripting</b><small>文件 · 代码</small></div>
+                                <div class="agent-sub"><b>General</b><small>通用工具</small></div>
+                            </div>
+                        </div>
+                    </div>
+                </article>
+
+                <article class="capability capability-proactive reveal">
+                    <div class="capability-number">03</div>
+                    <div class="capability-copy">
+                        <p class="eyebrow">PROACTIVE PUSH · 主动推送</p>
+                        <h3>你不找它，<br />它也会来找你。</h3>
+                        <p>
+                            主动推送引擎定时轮询内容源，结合记忆画像由大模型做 0-10 分相关性评分，值得推送才发送。支持 at / after / every / cron 四种触发模式，检查点机制保障长任务可靠执行。
+                        </p>
+                    </div>
+                    <div class="capability-visual" aria-hidden="true">
+                        <div class="push-meter">
+                            <div class="push-bar"></div>
+                            <div class="push-markers">
+                                <span>0</span><span>5</span><span>10</span>
+                            </div>
+                            <small>相关性评分 · 由 LLM 判断是否推送</small>
+                        </div>
+                    </div>
+                </article>
+            </div>
+        </section>
+
+        <!-- 插件生态 -->
+        <section class="plugin-section shell">
+            <div class="plugin-head reveal">
+                <p class="eyebrow">PLUGIN ECOSYSTEM</p>
+                <h2>插件化工具生态，<br />想加什么加什么。</h2>
+                <p>插件自动发现与加载，扫描 <code>plugins/*/plugin.py</code> 即可注册。三重安全防护：工具循环检测 + Shell 安全审查 + Token 压力管控。</p>
+            </div>
+            <div class="plugin-grid reveal">
+                <div>
+                    <span>01</span>
+                    <h3>生活助手</h3>
+                    <p><code>记账</code><code>学习计划</code><code>番茄钟</code><code>天气</code><code>定时任务</code></p>
+                </div>
+                <div>
+                    <span>02</span>
+                    <h3>工具系统</h3>
+                    <p><code>Shell</code><code>文件系统</code><code>记忆管理</code><code>技能系统</code></p>
+                </div>
+                <div>
+                    <span>03</span>
+                    <h3>网络能力</h3>
+                    <p><code>web_search</code><code>web_fetch</code><code>arXiv</code><code>MCP 协议</code></p>
+                </div>
+                <div>
+                    <span>04</span>
+                    <h3>安全防护</h3>
+                    <p><code>shell_safety</code><code>tool_loop_guard</code><code>context_pressure</code></p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 功能展示 -->
+        <section class="showcase shell" id="showcase">
+            <div class="section-head reveal">
+                <p class="eyebrow">IN ACTION</p>
+                <h2>日常中的番茄猫。</h2>
+            </div>
+
+            <!-- 移动端 -->
+            <div class="showcase-category">
+                <div class="category-header reveal">
+                    <span class="channel-badge mobile">📱 移动端 · Telegram / QQ</span>
+                    <h3>随时随地的 AI 助手</h3>
+                </div>
+                <div class="mobile-showcase">
+                    <div class="phone-frame reveal">
+                        <div class="phone-notch"></div>
+                        <div class="phone-screen">
+                            <img src="assets/telegram-weather.png" alt="天气主动推送" loading="lazy" />
+                        </div>
+                        <div class="phone-label">
+                            <h4>🌤️ 天气主动推送</h4>
+                            <p>结合记忆画像，到点提醒穿衣带伞</p>
+                        </div>
+                    </div>
+                    <div class="phone-frame reveal">
+                        <div class="phone-notch"></div>
+                        <div class="phone-screen">
+                            <img src="assets/qq-accounting.png" alt="智能记账" loading="lazy" />
+                        </div>
+                        <div class="phone-label">
+                            <h4>💰 自然语言记账</h4>
+                            <p>一句话记录收支，自动统计</p>
+                        </div>
+                    </div>
+                    <div class="phone-frame reveal">
+                        <div class="phone-notch"></div>
+                        <div class="phone-screen">
+                            <img src="assets/qq-study.png" alt="学习进度" loading="lazy" />
+                        </div>
+                        <div class="phone-label">
+                            <h4>📚 学习进度追踪</h4>
+                            <p>自定义学习计划，每日打卡</p>
+                        </div>
+                    </div>
+                    <div class="phone-frame reveal">
+                        <div class="phone-notch"></div>
+                        <div class="phone-screen">
+                            <img src="assets/qq-meme.png" alt="表情包" loading="lazy" />
+                        </div>
+                        <div class="phone-label">
+                            <h4>😺 表情包互动</h4>
+                            <p>AI 驱动的可爱表情回复</p>
+                        </div>
+                    </div>
+                    <div class="phone-frame reveal">
+                        <div class="phone-notch"></div>
+                        <div class="phone-screen">
+                            <img src="assets/telegram-arxiv.png" alt="arXiv 论文推送" loading="lazy" />
+                        </div>
+                        <div class="phone-label">
+                            <h4>📄 论文推送</h4>
+                            <p>arXiv 每日精选，带解读摘要</p>
+                        </div>
+                    </div>
+                    <div class="phone-frame reveal">
+                        <div class="phone-notch"></div>
+                        <div class="phone-screen">
+                            <img src="assets/scheduler.jpg" alt="定时任务" loading="lazy" />
+                        </div>
+                        <div class="phone-label">
+                            <h4>⏰ 定时任务</h4>
+                            <p>你的生活贴心小助手</p>
+                        </div>
+                    </div>
+                    <div class="phone-frame reveal">
+                        <div class="phone-notch"></div>
+                        <div class="phone-screen">
+                            <img src="assets/qq-image-analysis.png" alt="图片分析" loading="lazy" />
+                        </div>
+                        <div class="phone-label">
+                            <h4>🖼️ 图片多模态分析</h4>
+                            <p>识别图片内容，智能问答</p>
+                        </div>
+                    </div>
+                    <div class="phone-frame reveal">
+                        <div class="phone-notch"></div>
+                        <div class="phone-screen">
+                            <img src="assets/telegram-subagent.png" alt="后台子任务" loading="lazy" />
+                        </div>
+                        <div class="phone-label">
+                            <h4>⚡ 后台异步调研</h4>
+                            <p>子 Agent 执行，完成后主动推送</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 桌面端 -->
+            <div class="showcase-category">
+                <div class="category-header reveal">
+                    <span class="channel-badge desktop">🖥️ 桌面端</span>
+                    <h3>像素猫咪陪伴你的桌面</h3>
+                </div>
+                <div class="showcase-desktop">
+                    <div class="desktop-card reveal">
+                        <img src="assets/desktop-chat.gif" alt="便携小窗聊天" loading="lazy" />
+                        <h4>便携小窗聊天</h4>
+                        <p>双击猫咪打开迷你窗口，随时对话不打扰</p>
+                    </div>
+                    <div class="desktop-card reveal">
+                        <img src="assets/desktop-pomodoro.gif" alt="番茄钟" loading="lazy" />
+                        <h4>番茄钟专注</h4>
+                        <p>点击启动番茄钟，工作休息循环</p>
+                    </div>
+                    <div class="desktop-card reveal">
+                        <img src="assets/desktop-file.gif" alt="文件分析" loading="lazy" />
+                        <h4>拖拽文件自动分析</h4>
+                        <p>拖到猫咪身上，自动读取摘要</p>
+                    </div>
+                    <div class="desktop-card reveal">
+                        <img src="assets/theme.gif" alt="切换主题" loading="lazy" />
+                        <h4>切换主题颜色</h4>
+                        <p>预设6色主题，可自由切换</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 管理仪表盘 -->
+        <section class="dashboard-section shell">
+            <div class="section-head reveal">
+                <p class="eyebrow">DASHBOARD</p>
+                <h2>可视化管理，<br />一切尽在掌握。</h2>
+            </div>
+            <p class="section-summary reveal">
+                Web 管理后台实时监控运行状态，管理记忆、技能、定时任务和文件，所有数据一目了然。
+            </p>
+
+            <div class="dashboard-preview reveal">
+                <div class="dashboard-frame">
+                    <div class="dashboard-header">
+                        <span></span><span></span><span></span>
+                        <b>localhost:8765</b>
+                    </div>
+                    <img src="assets/dashboard.png" alt="番茄猫管理仪表盘" loading="lazy" />
+                </div>
+            </div>
+
+            <div class="dashboard-features reveal">
+                <div>
+                    <span>📊</span>
+                    <h4>实时数据监控</h4>
+                    <p>运行时长、消息数、技能数、定时任务一目了然</p>
+                </div>
+                <div>
+                    <span>🧠</span>
+                    <h4>记忆管理</h4>
+                    <p>查看和管理五层记忆体系，了解番茄猫记住了什么</p>
+                </div>
+                <div>
+                    <span>⚙️</span>
+                    <h4>技能管理</h4>
+                    <p>查看已安装技能，配置启用状态和权限</p>
+                </div>
+                <div>
+                    <span>⏰</span>
+                    <h4>定时任务</h4>
+                    <p>管理主动推送任务，调整触发时间和频率</p>
+                </div>
+                <div>
+                    <span>📁</span>
+                    <h4>文件浏览器</h4>
+                    <p>浏览工作区文件，查看检查点状态</p>
+                </div>
+                <div>
+                    <span>🌐</span>
+                    <h4>本地访问</h4>
+                    <p>默认监听 localhost:8765，安全便捷</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 快速开始 -->
+        <section class="start shell" id="start">
+            <div class="start-copy reveal">
+                <p class="eyebrow">QUICKSTART</p>
+                <h2>几分钟，<br />让番茄猫住进你的电脑。</h2>
+                <p>
+                    使用 uv 包管理器快速安装，配置好 API Key 即可启动。支持桌面模式和命令行模式，工作目录通过 <code>--workspace</code> 参数灵活指定。
+                </p>
+                <a class="button button-primary" href="https://github.com/idontcarethishahaha/tomatocat-agent#readme" target="_blank" rel="noreferrer">
+                    阅读完整文档 <span>↗</span>
+                </a>
+            </div>
+            <div class="terminal-code reveal" aria-label="TomatoCat 快速开始命令">
+                <div>
+                    <span></span><span></span><span></span>
+                    <b>terminal</b>
+                </div>
+                <pre><code><em># 安装 uv 包管理器</em>
+$ pip install uv
+
+<em># 创建 Python 3.12 虚拟环境</em>
+$ uv venv --python 3.12.7
+
+<em># 安装依赖</em>
+$ .venv\Scripts\activate
+$ uv sync
+
+<em># 启动桌面端</em>
+$ uv run python main.py --desktop --workspace D:\tomatocat-workspace</code></pre>
+            </div>
+        </section>
+
+        <!-- 结尾 -->
+        <section class="closing shell reveal">
+            <div class="closing-icon">🍅🐱</div>
+            <p>有记忆，会主动，<br /><em>像真的猫咪一样陪伴你。</em></p>
+            <a class="button button-primary" href="https://github.com/idontcarethishahaha/tomatocat-agent" target="_blank" rel="noreferrer">
+                把番茄猫带回家 <span>↗</span>
+            </a>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <div class="shell footer-inner">
+            <span>© 2026 TomatoCat Agent</span>
+            <span>Built with 🐱 and 🍅.</span>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
