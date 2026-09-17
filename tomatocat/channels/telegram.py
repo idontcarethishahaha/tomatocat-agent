@@ -93,6 +93,7 @@ class TelegramChannel(Channel):
         self.token = token
         self.allow_from = allow_from or []
         self._application: Any = None
+        self._polling = False
         self._live: dict[str, _LiveState] = {}
         self._upload_dir = upload_dir or Path(".")
 
@@ -116,23 +117,40 @@ class TelegramChannel(Channel):
         await self._application.initialize()
         await self._application.start()
         await self._application.updater.start_polling()
+        self._polling = True
         logger.info("[telegram] Telegram 渠道已启动")
         print("渠道已启动: telegram")
 
     async def stop(self) -> None:
         if self._application:
-            await self._application.updater.stop()
+            if self._polling:
+                await self._application.updater.stop()
             await self._application.stop()
             await self._application.shutdown()
+            self._application = None
+            self._polling = False
+
+    async def start_sender(self) -> None:
+        """Initialize outbound Telegram access without starting polling."""
+        if self._application:
+            return
+        if not self.token:
+            raise RuntimeError("telegram token is not configured")
+        self._application = ApplicationBuilder().token(self.token).build()
+        await self._application.initialize()
+        await self._application.start()
 
     async def send_message(self, chat_id: str, text: str) -> None:
         """发送主动消息，带超时和重试"""
-        if not self._application or not chat_id:
-            return
+        if not self._application:
+            raise RuntimeError("telegram sender is not initialized")
+        if not chat_id:
+            raise ValueError("telegram chat_id is required")
 
         if ":" in str(chat_id):
             chat_id = str(chat_id).split(":", 1)[1]
 
+        last_error: Exception | None = None
         for attempt in range(_SEND_RETRIES + 1):
             try:
                 await asyncio.wait_for(
@@ -145,7 +163,8 @@ class TelegramChannel(Channel):
                 )
                 logger.info(f"[telegram] 主动消息已发送至 {chat_id}")
                 return
-            except TimedOut:
+            except TimedOut as e:
+                last_error = e
                 logger.warning(
                     f"[telegram] 主动消息发送超时 (attempt {attempt + 1}/{_SEND_RETRIES + 1}) chat_id={chat_id}"
                 )
@@ -154,9 +173,12 @@ class TelegramChannel(Channel):
                 else:
                     logger.error(f"[telegram] 主动消息发送失败（超时重试耗尽）: chat_id={chat_id}")
             except RetryAfter as e:
+                last_error = e
                 logger.warning(f"[telegram] 触发限流，等待 {e.retry_after}s 后重试")
-                await asyncio.sleep(e.retry_after)
+                if attempt < _SEND_RETRIES:
+                    await asyncio.sleep(e.retry_after)
             except NetworkError as e:
+                last_error = e
                 logger.warning(
                     f"[telegram] 网络错误 (attempt {attempt + 1}): {e}"
                 )
@@ -166,7 +188,8 @@ class TelegramChannel(Channel):
                     logger.error(f"[telegram] 主动消息发送失败（网络错误重试耗尽）: {e}")
             except Exception as e:
                 logger.error(f"[telegram] 主动消息发送失败: {e}")
-                return
+                raise
+        raise RuntimeError(f"telegram message delivery failed: {last_error}") from last_error
 
     async def send_photo(self, chat_id: str, photo_path: str, caption: str = "") -> None:
         if not self._application or not chat_id:

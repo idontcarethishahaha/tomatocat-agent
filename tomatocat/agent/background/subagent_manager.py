@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
+import json
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone as _tz_utc
 from pathlib import Path
@@ -24,6 +25,7 @@ from .subagent_profiles import (
     SubagentSpec,
     build_spawn_spec,
 )
+from ...task_store import TaskStore
 
 logger = logging.getLogger("subagent_manager")
 
@@ -31,6 +33,14 @@ _RESULT_MAX_CHARS = 12_000
 _SYNC_RESULT_MAX_CHARS = 100_000
 _SPAWN_MAX_ITERATIONS = 50
 _SYNC_MAX_ITERATIONS = 10
+_SPAWN_TIMEOUT_SECONDS = 30 * 60
+_SYNC_TIMEOUT_SECONDS = 10 * 60
+_DEFAULT_TOOL_TIMEOUT_SECONDS = 120
+_SHELL_TOOL_TIMEOUT_SECONDS = 660
+
+
+def _retry_policy_for_profile(profile: str) -> str:
+    return "safe" if profile == PROFILE_RESEARCH else "confirm"
 
 
 class SubAgentToolWrapper:
@@ -70,7 +80,15 @@ class SubAgentToolWrapper:
         # 文件类工具：把相对路径限制在 task_dir 内
         if self.name in self._FILE_TOOLS:
             kwargs = self._rewrite_file_paths(kwargs)
-        return await self._plugin_manager.execute_tool(self._tool_info.name, kwargs)
+        timeout = _SHELL_TOOL_TIMEOUT_SECONDS if self.name in {"shell", "task_output", "task_stop"} else _DEFAULT_TOOL_TIMEOUT_SECONDS
+        try:
+            return await asyncio.wait_for(
+                self._plugin_manager.execute_tool(self._tool_info.name, kwargs),
+                timeout=timeout,
+            )
+        except asyncio.TimeoutError:
+            logger.error("[subagent] tool timeout tool=%s timeout=%ss", self.name, timeout)
+            return f"工具执行超时（>{timeout}秒）: {self.name}"
 
     def _rewrite_file_paths(self, kwargs: dict[str, Any]) -> dict[str, Any]:
         """把文件路径参数限制在 task_dir 内，禁止写到 workspace 根目录"""
@@ -84,16 +102,14 @@ class SubAgentToolWrapper:
             return kwargs
 
         p = Path(str(raw_path))
-        if not p.is_absolute():
-            # 相对路径 -> 自动加上 task_dir 前缀
-            p = self._task_dir / p
-        else:
-            # 绝对路径 -> 如果不在 task_dir 内，强制重定向到 task_dir
-            try:
-                p.relative_to(self._task_dir)
-            except ValueError:
-                # 路径在 task_dir 之外，把文件名提取出来放到 task_dir 下
-                p = self._task_dir / p.name
+        task_root = self._task_dir.resolve()
+        candidate = p.resolve() if p.is_absolute() else (task_root / p).resolve()
+        try:
+            candidate.relative_to(task_root)
+            p = candidate
+        except ValueError:
+            # Never follow ../ or an absolute path outside the sandbox.
+            p = task_root / p.name
         kwargs[path_key] = str(p)
         return kwargs
 
@@ -125,11 +141,13 @@ class SubagentManager:
         max_tokens: int,
         plugin_manager: Any = None,
         send_fn: Any = None,
+        task_store: TaskStore | None = None,
     ) -> None:
         self._workspace = workspace
         self._event_bus = event_bus
         self._plugin_manager = plugin_manager
         self._send_fn = send_fn
+        self._task_store = task_store
         self._runtime = SubagentRuntime(
             provider=provider,
             model=model,
@@ -138,6 +156,7 @@ class SubagentManager:
         self._running_tasks: dict[str, asyncio.Task[None]] = {}
         self._running_jobs: dict[str, RunningSubagentJob] = {}
         self._cancel_announced: set[str] = set()
+        self._stopping = False
 
     def _spawn_jobs_dir(self) -> Path:
         root = self._workspace / "subagent-runs"
@@ -160,9 +179,11 @@ class SubagentManager:
 
         适合：调研后需要立即回复用户的任务，预计 ≤ 10 次工具调用。
         """
-        job_id = uuid.uuid4().hex[:8]
+        job_id = uuid.uuid4().hex
         display_label = (label or task[:30] or job_id).strip()
         task_dir = self._job_task_dir(job_id)
+        if self._task_store:
+            self._task_store.create(job_id, "subagent", payload=json.dumps({"task": task}, ensure_ascii=False), status="queued", retry_count=0, label=display_label, profile=profile, retry_policy=_retry_policy_for_profile(profile))
 
         logger.info(
             "[spawn_sync] started job_id=%s label=%r profile=%s",
@@ -177,12 +198,28 @@ class SubagentManager:
             max_iterations=_SYNC_MAX_ITERATIONS,
         )
         try:
-            result = await subagent.run(task)
+            result = await asyncio.wait_for(subagent.run(task), timeout=_SYNC_TIMEOUT_SECONDS)
             exit_reason = getattr(subagent, "last_exit_reason", None) or "completed"
+        except asyncio.TimeoutError:
+            logger.error("[spawn_sync] subagent timeout job_id=%s", job_id)
+            result = "后台任务执行超时"
+            exit_reason = "timeout"
         except Exception as e:
             logger.exception("[spawn_sync] subagent failed job_id=%s err=%s", job_id, e)
             result = f"执行出错：{e}"
             exit_reason = "error"
+
+        if self._task_store:
+            final_status = "failed" if exit_reason in {"error", "timeout"} else (
+                "partial" if exit_reason in {"forced_summary", "forced_summary_fallback"} else "completed"
+            )
+            self._task_store.update(
+                job_id,
+                final_status,
+                result=result,
+                error=result if final_status == "failed" else None,
+                expected_status="queued",
+            )
 
         truncated = result
         if len(truncated) > _SYNC_RESULT_MAX_CHARS:
@@ -211,9 +248,22 @@ class SubagentManager:
         retry_count: int = 0,
     ) -> str:
         """创建后台 subagent 任务，并立即把控制权还给主 agent。"""
-        job_id = uuid.uuid4().hex[:8]
+        job_id = uuid.uuid4().hex
         display_label = (label or task[:30] or job_id).strip()
         task_dir = self._job_task_dir(job_id)
+        if self._task_store:
+            self._task_store.create(
+                job_id,
+                "subagent",
+                payload=json.dumps({"task": task, "profile": profile, "label": display_label, "origin_channel": origin_channel, "origin_chat_id": origin_chat_id}, ensure_ascii=False),
+                status="queued",
+                retry_count=retry_count,
+                label=display_label,
+                profile=profile,
+                origin_channel=origin_channel,
+                origin_chat_id=origin_chat_id,
+                retry_policy=_retry_policy_for_profile(profile),
+            )
 
         bg_task = asyncio.create_task(
             self._run_subagent(
@@ -229,19 +279,19 @@ class SubagentManager:
             name=f"spawn:{job_id}",
         )
 
-        self._running_tasks[job_id] = bg_task
-        self._running_jobs[job_id] = RunningSubagentJob(
+        self._register_running_job(
             job_id=job_id,
+            bg_task=bg_task,
             label=display_label,
             task=task,
             profile=profile,
             origin_channel=origin_channel,
             origin_chat_id=origin_chat_id,
-            task_dir=str(task_dir),
+            task_dir=task_dir,
             retry_count=retry_count,
-            started_at=datetime.now(_tz_utc.utc).isoformat(),
         )
-        bg_task.add_done_callback(lambda _: self._forget_running_job(job_id))
+        if self._task_store:
+            self._task_store.update(job_id, "running", expected_status="queued")
 
         logger.info(
             "[spawn] started job_id=%s label=%r profile=%s retry_count=%d origin=%s:%s",
@@ -257,11 +307,90 @@ class SubagentManager:
             "不要等待其完成；请直接向用户说明你已开始处理，完成后会继续回复。"
         )
 
+    def _register_running_job(
+        self,
+        *,
+        job_id: str,
+        bg_task: asyncio.Task[None],
+        label: str,
+        task: str,
+        profile: str,
+        origin_channel: str,
+        origin_chat_id: str,
+        task_dir: Path,
+        retry_count: int,
+    ) -> None:
+        self._running_tasks[job_id] = bg_task
+        self._running_jobs[job_id] = RunningSubagentJob(
+            job_id=job_id,
+            label=label,
+            task=task,
+            profile=profile,
+            origin_channel=origin_channel,
+            origin_chat_id=origin_chat_id,
+            task_dir=str(task_dir),
+            retry_count=retry_count,
+            started_at=datetime.now(_tz_utc.utc).isoformat(),
+        )
+        bg_task.add_done_callback(lambda _: self._forget_running_job(job_id))
+
     def get_running_count(self) -> int:
         return len(self._running_tasks)
 
+    async def retry_job(self, job_id: str, *, allow_side_effects: bool = False) -> asyncio.Task[None] | None:
+        """Safely rebuild and execute one interrupted subagent job."""
+        if not self._task_store:
+            return None
+        record = self._task_store.claim_retry(job_id, allow_side_effects=allow_side_effects)
+        if not record:
+            return None
+        try:
+            metadata = json.loads(record.payload)
+        except (TypeError, json.JSONDecodeError):
+            # Older records stored the task itself as plain text.
+            metadata = {"task": record.payload}
+        if not isinstance(metadata, dict):
+            metadata = {"task": str(metadata)}
+        task = str(metadata.get("task", "")).strip()
+        if not task:
+            self._task_store.update(job_id, "failed", error="empty task payload", expected_status="queued")
+            return None
+        label = record.label or str(metadata.get("label") or task[:30] or job_id)
+        profile = record.profile or str(metadata.get("profile") or PROFILE_RESEARCH)
+        origin_channel = record.origin_channel or str(metadata.get("origin_channel") or "unknown")
+        origin_chat_id = record.origin_chat_id or str(metadata.get("origin_chat_id") or "")
+        task_dir = self._job_task_dir(job_id)
+        bg_task = asyncio.create_task(self._run_subagent(
+            job_id=job_id, task=task, label=label, task_dir=task_dir,
+            origin_channel=origin_channel, origin_chat_id=origin_chat_id,
+            profile=profile, retry_count=record.retry_count,
+        ), name=f"retry:{job_id}")
+        self._register_running_job(
+            job_id=job_id,
+            bg_task=bg_task,
+            label=label,
+            task=task,
+            profile=profile,
+            origin_channel=origin_channel,
+            origin_chat_id=origin_chat_id,
+            task_dir=task_dir,
+            retry_count=record.retry_count,
+        )
+        self._task_store.update(job_id, "running", expected_status="queued")
+        return bg_task
+
     def list_running_jobs(self) -> list[dict[str, Any]]:
         return [asdict(job) for job in self._running_jobs.values()]
+
+    async def resume_pending_deliveries(self) -> int:
+        """Deliver notifications that were persisted but never attempted."""
+        if not self._task_store or not self._send_fn:
+            return 0
+        delivered = 0
+        for record in self._task_store.list_pending_deliveries():
+            if await self._deliver_outbox_record(record.job_id) == "delivered":
+                delivered += 1
+        return delivered
 
     async def cancel(self, job_id: str) -> bool:
         task = self._running_tasks.get(job_id)
@@ -275,6 +404,32 @@ class SubagentManager:
         await asyncio.sleep(0)
         logger.info("[spawn] cancel requested job_id=%s", job_id)
         return True
+
+    async def stop(self) -> None:
+        """Cancel and await background jobs before their shared resources close."""
+        active = [
+            (job_id, task)
+            for job_id, task in self._running_tasks.items()
+            if not task.done()
+        ]
+        tasks = [task for _, task in active]
+        if not tasks:
+            return
+        self._stopping = True
+        try:
+            if self._task_store:
+                for job_id, _ in active:
+                    self._task_store.update(
+                        job_id,
+                        "retry_wait",
+                        error="service stopped during execution",
+                        expected_status="running",
+                    )
+            for task in tasks:
+                task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+        finally:
+            self._stopping = False
 
     def _forget_running_job(self, job_id: str) -> None:
         self._running_tasks.pop(job_id, None)
@@ -304,12 +459,12 @@ class SubagentManager:
         result_text = ""
 
         try:
-            result_text = await subagent.run(task)
+            result_text = await asyncio.wait_for(subagent.run(task), timeout=_SPAWN_TIMEOUT_SECONDS)
             exit_reason = getattr(subagent, "last_exit_reason", None) or "completed"
             if exit_reason in ("error", "forced_summary", "forced_summary_fallback"):
                 status = "partial"
         except asyncio.CancelledError:
-            if job_id not in self._cancel_announced:
+            if not self._stopping and job_id not in self._cancel_announced:
                 await self._announce_result(
                     job_id=job_id,
                     label=label,
@@ -323,6 +478,11 @@ class SubagentManager:
                     retry_count=retry_count,
                 )
             raise
+        except asyncio.TimeoutError:
+            logger.error("[spawn] subagent timeout job_id=%s", job_id)
+            status = "failed"
+            exit_reason = "timeout"
+            result_text = "后台任务执行超时"
         except Exception as e:
             logger.exception("[spawn] subagent failed job_id=%s err=%s", job_id, e)
             status = "failed"
@@ -441,13 +601,31 @@ class SubagentManager:
         profile: str,
         retry_count: int,
     ) -> None:
-        """把后台结果包装成内部事件，重新投回主 agent 的消息总线。"""
+        """Persist a result, deliver its notification, and publish an observation event."""
+        final_status = status if status in {"completed", "partial", "failed", "cancelled"} else "failed"
         payload_result = result
         if len(payload_result) > _RESULT_MAX_CHARS:
             original_len = len(payload_result)
             payload_result = (
                 payload_result[:_RESULT_MAX_CHARS]
                 + f"\n...[结果已截断，原始长度 {original_len}]"
+            )
+
+        delivery_message = ""
+        if self._send_fn and origin_channel != "unknown" and origin_chat_id:
+            delivery_message = (
+                f"[后台任务完成]\n任务ID：{job_id}\n任务：{label}\n"
+                f"状态：{status}\n\n{payload_result}"
+            )
+
+        persisted = False
+        if self._task_store:
+            persisted = self._task_store.finish_and_queue_delivery(
+                job_id,
+                final_status,
+                result=result,
+                error=result if final_status == "failed" else "",
+                delivery_message=delivery_message,
             )
 
         event = SpawnCompletionEvent(
@@ -459,18 +637,8 @@ class SubagentManager:
             result=payload_result,
             retry_count=retry_count,
             profile=profile,
+            delivery_status="not_required",
         )
-
-        from ...bus import InboundMessage
-
-        session_key = f"{origin_channel}:{origin_chat_id}" if origin_channel != "unknown" else origin_chat_id
-        msg = InboundMessage(
-            session_key=session_key,
-            text=f"[后台任务完成]\n任务：{label}\n状态：{status}\n\n{payload_result}",
-            channel=origin_channel,
-        )
-        msg._is_spawn_completion = True
-        msg._spawn_event = event
 
         logger.info(
             "[spawn] completed job_id=%s status=%s exit_reason=%s profile=%s retry_count=%d route=%s:%s",
@@ -483,15 +651,52 @@ class SubagentManager:
             origin_chat_id,
         )
 
-        if self._send_fn and origin_channel != "unknown" and origin_chat_id:
+        if delivery_message and persisted:
+            event.delivery_status = await self._deliver_outbox_record(job_id)
+        elif delivery_message and not self._task_store:
             try:
-                await self._send_fn(
-                    origin_channel,
-                    origin_chat_id,
-                    f"[后台任务完成]\n任务：{label}\n状态：{status}\n\n{payload_result}",
-                )
+                await self._send_fn(origin_channel, origin_chat_id, delivery_message)
+                event.delivery_status = "delivered"
             except Exception as e:
                 logger.warning("[spawn] 主动通知发送失败: %s", e)
+                event.delivery_status = "failed"
+        elif self._task_store:
+            current = self._task_store.get(job_id)
+            if current:
+                event.delivery_status = current.delivery_status
+        if self._event_bus:
+            self._event_bus.enqueue(event)
+
+    async def _deliver_outbox_record(self, job_id: str) -> str:
+        if not self._task_store or not self._send_fn:
+            return "not_required"
+        record = self._task_store.claim_delivery(job_id)
+        if record is None:
+            current = self._task_store.get(job_id)
+            return current.delivery_status if current else "not_required"
+        try:
+            await self._send_fn(
+                record.origin_channel,
+                record.origin_chat_id,
+                record.delivery_message,
+            )
+            self._task_store.update_delivery(
+                job_id,
+                "delivered",
+                expected_status="sending",
+                increment_attempts=True,
+            )
+            return "delivered"
+        except Exception as exc:
+            logger.warning("[spawn] 主动通知发送失败 job_id=%s: %s", job_id, exc)
+            self._task_store.update_delivery(
+                job_id,
+                "failed",
+                error=str(exc),
+                expected_status="sending",
+                increment_attempts=True,
+            )
+            return "failed"
 
 
 @dataclass
@@ -504,3 +709,4 @@ class SpawnCompletionEvent:
     result: str
     retry_count: int
     profile: str
+    delivery_status: str = "not_required"

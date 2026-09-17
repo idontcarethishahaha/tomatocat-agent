@@ -57,7 +57,27 @@ _setup_logging()
 logger = logging.getLogger("tomatocat")
 
 
-async def serve(config_path: Path, workspace: Path) -> dict:
+def _make_channel_sender(channels: list):
+    async def send_to_channel(channel_name: str, chat_id: str, message: str) -> None:
+        for channel in channels:
+            if channel.__class__.__name__.lower().startswith(channel_name.lower()):
+                if not hasattr(channel, "send_message"):
+                    raise RuntimeError(f"channel {channel_name} does not support sending")
+                await channel.send_message(chat_id, message)
+                return
+        raise LookupError(f"channel {channel_name} is not configured")
+
+    return send_to_channel
+
+
+async def serve(
+    config_path: Path,
+    workspace: Path,
+    *,
+    start_background_services: bool = True,
+    maintenance_mode: bool = False,
+    maintenance_channel: str = "",
+) -> dict:
     from tomatocat.config import Config
     from tomatocat.bus import EventBus
     from tomatocat.session import SessionManager
@@ -72,14 +92,38 @@ async def serve(config_path: Path, workspace: Path) -> dict:
     from tomatocat.meme import MemeService
     from tomatocat.proactive.engine import ProactiveEngine
     from tomatocat.scheduler import SchedulerService
+    from tomatocat.task_store import TaskStore
 
     print("\n🍅🐱 番茄猫 TomatoCat 启动中...")
     print(f"   配置文件: {config_path}")
     print(f"   工作目录: {workspace}")
     print("")
 
-    config = Config.load(config_path)
+    try:
+        config = Config.load(config_path)
+        config.validate_or_raise()
+    except (OSError, ValueError) as exc:
+        logger.error("Configuration error: %s", exc)
+        raise
     workspace.mkdir(parents=True, exist_ok=True)
+
+    instance_lock = None
+    if not maintenance_mode:
+        from tomatocat.instance_lock import WorkspaceInstanceLock
+
+        instance_lock = WorkspaceInstanceLock(workspace / ".tomatocat.lock")
+        instance_lock.acquire()
+
+    logger.info(
+        "startup config=%s workspace=%s cli=%s telegram=%s qq=%s memory=%s vector=%s",
+        config_path,
+        workspace,
+        config.channels.cli.socket if config.channels.cli.enabled else "disabled",
+        "enabled" if config.channels.telegram.enabled else "disabled",
+        "enabled" if config.channels.qq.enabled else "disabled",
+        "enabled" if config.memory.enabled else "disabled",
+        "enabled" if config.memory.vector_enabled else "disabled",
+    )
 
     event_bus = EventBus()
     session_manager = SessionManager(workspace=workspace)
@@ -129,16 +173,20 @@ async def serve(config_path: Path, workspace: Path) -> dict:
         session_manager=session_manager,
         memory=memory,
     )
+    plugin_manager.context["config_path"] = Path(config_path).resolve()
+    plugin_manager.context["config"] = config
 
     # 先创建 channels（send_to_channel 需要它）
     channels: list = []
 
-    if config.channels.cli.enabled:
+    if config.channels.cli.enabled and (not maintenance_mode or maintenance_channel.lower() == "cli"):
         host, port_str = config.channels.cli.socket.split(":")
         cli_channel = CLISocketChannel(host=host, port=int(port_str))
         channels.append(cli_channel)
 
-    if config.channels.telegram.enabled and config.channels.telegram.token:
+    if config.channels.telegram.enabled and config.channels.telegram.token and (
+        not maintenance_mode or maintenance_channel.lower() == "telegram"
+    ):
         tg_channel = TelegramChannel(
             token=config.channels.telegram.token,
             allow_from=config.channels.telegram.allow_from,
@@ -146,7 +194,9 @@ async def serve(config_path: Path, workspace: Path) -> dict:
         )
         channels.append(tg_channel)
 
-    if config.channels.qq.enabled and config.channels.qq.bot_uin:
+    if config.channels.qq.enabled and config.channels.qq.bot_uin and (
+        not maintenance_mode or maintenance_channel.lower() == "qq"
+    ):
         qq_channel = QQChannel(
             bot_uin=config.channels.qq.bot_uin,
             allow_from=config.channels.qq.allow_from,
@@ -155,13 +205,12 @@ async def serve(config_path: Path, workspace: Path) -> dict:
         )
         channels.append(qq_channel)
 
-    async def send_to_channel(channel_name: str, chat_id: str, message: str) -> None:
-        for ch in channels:
-            if ch.__class__.__name__.lower().startswith(channel_name.lower()):
-                if hasattr(ch, "send_message"):
-                    await ch.send_message(chat_id, message)
-                return
+    send_to_channel = _make_channel_sender(channels)
 
+    task_store = TaskStore(workspace / "tasks.db")
+    interrupted = 0 if maintenance_mode else task_store.mark_interrupted()
+    if interrupted:
+        logger.warning("marked %d interrupted background task(s) as retry_wait", interrupted)
     subagent_manager = None
     if llm_provider and config.llm_fast.model:
         from tomatocat.agent.background.subagent_manager import SubagentManager
@@ -180,6 +229,7 @@ async def serve(config_path: Path, workspace: Path) -> dict:
             max_tokens=8192,
             plugin_manager=plugin_manager,
             send_fn=send_to_channel,
+            task_store=task_store,
         )
         plugin_manager.context["subagent_manager"] = subagent_manager
         logger.info("子 Agent 管理器已就绪")
@@ -222,19 +272,31 @@ async def serve(config_path: Path, workspace: Path) -> dict:
     async def message_handler(session_key: str, text: str, channel: str, **kwargs) -> dict:
         return await agent.handle_message(session_key, text, channel, **kwargs)
 
-    for ch in channels:
-        ch.set_handler(message_handler)
+    if not maintenance_mode:
+        for ch in channels:
+            ch.set_handler(message_handler)
 
-    for ch in channels:
-        try:
-            await ch.start()
-            logger.info("[channel] %s 已启动", ch.__class__.__name__)
-        except Exception as e:
-            logger.error("[channel] %s 启动失败: %s（该渠道不可用，其他渠道不受影响）",
-                         ch.__class__.__name__, e)
+    if not maintenance_mode:
+        for ch in channels:
+            try:
+                await ch.start()
+                logger.info("[channel] %s 已启动", ch.__class__.__name__)
+            except Exception as e:
+                logger.error("[channel] %s 启动失败: %s（该渠道不可用，其他渠道不受影响）",
+                             ch.__class__.__name__, e)
+    else:
+        for ch in channels:
+            start_sender = getattr(ch, "start_sender", None)
+            if start_sender:
+                await start_sender()
+
+    if not maintenance_mode and subagent_manager:
+        recovered_deliveries = await subagent_manager.resume_pending_deliveries()
+        if recovered_deliveries:
+            logger.info("恢复投递了 %d 条后台任务通知", recovered_deliveries)
 
     proactive = None
-    if config.proactive.enabled and config.mcp.enabled:
+    if start_background_services and config.proactive.enabled and config.mcp.enabled:
         async def llm_call_wrapper(prompt: str) -> str:
             return await agent.llm.simple_chat(prompt)
 
@@ -254,7 +316,7 @@ async def serve(config_path: Path, workspace: Path) -> dict:
 
     scheduler = None
     scheduler_plugin = None
-    if config.scheduler.enabled:
+    if start_background_services and config.scheduler.enabled:
         default_channel = config.scheduler.default_channel or config.proactive.target.channel
         default_chat_id = config.scheduler.default_chat_id or config.proactive.target.chat_id
 
@@ -275,6 +337,7 @@ async def serve(config_path: Path, workspace: Path) -> dict:
             agent_fn=scheduler_agent_fn,
             default_tz=config.scheduler.timezone,
             checkpoint_manager=checkpoint_manager,
+            task_store=task_store,
         )
         await scheduler.start()
 
@@ -288,16 +351,19 @@ async def serve(config_path: Path, workspace: Path) -> dict:
 
         logger.info("定时任务服务已启动，时区: %s", config.scheduler.timezone)
 
-    from tomatocat.dashboard_api import DashboardAPI
-    dashboard = DashboardAPI(
-        workspace=workspace,
-        memory=memory,
-        skills_loader=skills_loader,
-        scheduler=scheduler,
-        host="127.0.0.1",
-        port=8765,
-    )
-    dashboard.start()
+    dashboard = None
+    if start_background_services:
+        from tomatocat.dashboard_api import DashboardAPI
+        dashboard = DashboardAPI(
+            workspace=workspace,
+            memory=memory,
+            skills_loader=skills_loader,
+            scheduler=scheduler,
+            host="127.0.0.1",
+            # 使用配置中的服务端口，便于多个项目实例并行运行
+            port=config.server.port,
+        )
+        dashboard.start()
 
     print("\n🍅🐱 番茄猫已启动喵~ (≧∇≦)ﾉ\n")
 
@@ -305,15 +371,59 @@ async def serve(config_path: Path, workspace: Path) -> dict:
         "agent": agent,
         "config": config,
         "plugin_manager": plugin_manager,
+        "subagent_manager": subagent_manager,
         "memory": memory,
+        "memory_runtime": memory_runtime,
         "meme_service": meme_service,
         "channels": channels,
         "proactive": proactive,
         "scheduler": scheduler,
+        "dashboard": dashboard,
         "mcp_client": mcp_client,
+        "task_store": task_store,
+        "instance_lock": instance_lock,
         "send_to_channel": send_to_channel,
         "stop_event": asyncio.Event(),
     }
+
+
+async def _shutdown_context(ctx: dict) -> None:
+    async def cleanup(label: str, operation) -> None:
+        try:
+            result = operation()
+            if hasattr(result, "__await__"):
+                await result
+        except Exception:
+            logger.exception("关闭 %s 失败", label)
+
+    try:
+        if ctx.get("dashboard"):
+            await cleanup("Dashboard", ctx["dashboard"].stop)
+        if ctx.get("proactive"):
+            await cleanup("Proactive", ctx["proactive"].stop)
+        if ctx.get("scheduler"):
+            await cleanup("Scheduler", ctx["scheduler"].stop)
+        if ctx.get("subagent_manager"):
+            await cleanup("后台子 Agent", ctx["subagent_manager"].stop)
+        for channel in ctx.get("channels", []):
+            await cleanup(channel.__class__.__name__, channel.stop)
+        event_bus = getattr(ctx.get("agent"), "event_bus", None)
+        if event_bus is not None:
+            await cleanup("EventBus", event_bus.aclose)
+        if ctx.get("plugin_manager"):
+            await cleanup("插件", ctx["plugin_manager"].unload_all)
+        if ctx.get("mcp_client"):
+            await cleanup("MCP", ctx["mcp_client"].close)
+        memory_runtime = ctx.get("memory_runtime")
+        for closeable in getattr(memory_runtime, "closeables", []):
+            close = getattr(closeable, "close", None)
+            if close is None:
+                continue
+            await cleanup(closeable.__class__.__name__, close)
+    finally:
+        instance_lock = ctx.get("instance_lock")
+        if instance_lock:
+            await cleanup("实例锁", instance_lock.release)
 
 
 async def _serve_forever(config_path: Path, workspace: Path) -> None:
@@ -335,18 +445,35 @@ async def _serve_forever(config_path: Path, workspace: Path) -> None:
     try:
         await stop_event.wait()
     finally:
-        if ctx["proactive"]:
-            await ctx["proactive"].stop()
-        if ctx["scheduler"]:
-            await ctx["scheduler"].stop()
-        for ch in ctx["channels"]:
-            try:
-                await ch.stop()
-            except Exception as e:
-                logger.error("渠道关闭失败: %s", e)
-        await ctx["plugin_manager"].unload_all()
-        await ctx["mcp_client"].close()
+        await _shutdown_context(ctx)
         print("\n🍅🐱 番茄猫下线了，晚安~ (=￣ω￣=)")
+
+
+async def _retry_once(config_path: Path, workspace: Path, job_id: str, *, allow_side_effects: bool = False) -> int:
+    from tomatocat.task_store import TaskStore
+
+    record = TaskStore(workspace / "tasks.db").get(job_id)
+    target_channel = record.origin_channel if record else ""
+    ctx = await serve(
+        config_path,
+        workspace,
+        start_background_services=False,
+        maintenance_mode=True,
+        maintenance_channel=target_channel,
+    )
+    try:
+        manager = ctx.get("subagent_manager")
+        if manager is None:
+            logger.error("retry unavailable: subagent manager is not configured")
+            return 2
+        task = await manager.retry_job(job_id, allow_side_effects=allow_side_effects)
+        if task is None:
+            logger.error("job %s is not retryable; side-effecting tasks require --force", job_id)
+            return 2
+        await task
+        return 0
+    finally:
+        await _shutdown_context(ctx)
 
 
 def _run_desktop(config_path: Path, workspace: Path) -> None:
@@ -375,7 +502,10 @@ def _run_desktop(config_path: Path, workspace: Path) -> None:
             ctx = await serve(config_path, workspace)
             agent_context.update(ctx)
             agent_ready.set()
-            await ctx["stop_event"].wait()
+            try:
+                await ctx["stop_event"].wait()
+            finally:
+                await _shutdown_context(ctx)
 
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
@@ -411,7 +541,7 @@ def _run_desktop(config_path: Path, workspace: Path) -> None:
     from PyQt6.QtCore import Qt, QTimer
 
     _mutex_handle = None
-    _MUTEX_NAME = "Global\\TomatoCatDesktopPet"
+    _MUTEX_NAME = "Global\\TomatoCatDesktopPetV1"
 
     def _acquire_lock():
         nonlocal _mutex_handle
@@ -578,10 +708,33 @@ def main() -> None:
     if workspace_value:
         workspace = Path(workspace_value)
 
+    if _has_flag(args, "jobs"):
+        from tomatocat.task_store import TaskStore
+        store = TaskStore(workspace / "tasks.db")
+        for job in store.list_all():
+            print(
+                f"{job.job_id}\t{job.task_type}\t{job.status}\t"
+                f"delivery={job.delivery_status}\tretries={job.retry_count}\t{job.updated_at}"
+            )
+        return
+
     # 重新配置日志，输出到工作区
     _setup_logging(workspace)
     log_file = workspace / "logs" / "bot.log"
     logger.info("日志已配置，输出到: %s", log_file)
+
+    if "retry" in args:
+        try:
+            job_id = args[args.index("retry") + 1]
+        except (ValueError, IndexError):
+            print("用法: python main.py retry JOB_ID [--force] --workspace DIR")
+            sys.exit(1)
+        sys.exit(asyncio.run(_retry_once(
+            config_path,
+            workspace,
+            job_id,
+            allow_side_effects=_has_flag(args, "--force"),
+        )))
 
     if _has_flag(args, "--desktop"):
         _run_desktop(config_path, workspace)

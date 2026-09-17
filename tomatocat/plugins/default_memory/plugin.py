@@ -39,4 +39,4 @@ class DefaultMemoryPlugin:
         from .engine import DefaultMemoryEngine
 
         engine = DefaultMemoryEngine(deps.workspace, deps.config, deps.llm_provider, deps.event_bus)
-        return MemoryPluginRuntime(engine=engine)
+        return MemoryPluginRuntime(engine=engine, closeables=[engine])

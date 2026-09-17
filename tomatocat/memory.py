@@ -1,6 +1,6 @@
-"""记忆引擎
+"""文件记忆后端。
 
-五层记忆架构：
+当前实现覆盖工作记忆、长期摘要和旧版向量索引：
 - SELF.md          : 番茄猫自我认知，由 consolidation 更新
 - MEMORY.md        : 用户长期画像，由 consolidation 自动整合
 - PENDING.md       : 每轮对话提取的碎片记忆，待整合
@@ -8,12 +8,16 @@
 - journal/         : 每日日记，追加写入
 - vectors.json     : 向量检索索引
 - Checkpoint 机制   : 整合过程支持检查点，失败后可重试
+
+结构化语义记忆由 ``tomatocat.memory2`` 提供。情感轨迹层尚未实现。
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import os
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -88,6 +92,8 @@ class MemoryEngine:
         self.memory_dir.mkdir(exist_ok=True)
         self.journal_dir = self.memory_dir / "journal"
         self.journal_dir.mkdir(exist_ok=True)
+        self.memory_versions_dir = self.memory_dir / "versions"
+        self.memory_versions_dir.mkdir(exist_ok=True)
         self.embedding = embedding
         self.vector_enabled = vector_enabled and embedding is not None
         self._checkpoint_manager = checkpoint_manager
@@ -171,7 +177,39 @@ class MemoryEngine:
 
     def update_memory_md(self, content: str) -> None:
         p = self.memory_dir / "MEMORY.md"
-        p.write_text(content, encoding="utf-8")
+        if p.exists():
+            version_name = datetime.now().strftime("MEMORY.%Y%m%dT%H%M%S%f.md")
+            self._atomic_write(self.memory_versions_dir / version_name, p.read_text(encoding="utf-8"))
+        self._atomic_write(p, content)
+
+    def list_memory_versions(self) -> list[str]:
+        return sorted(
+            (path.name for path in self.memory_versions_dir.glob("MEMORY.*.md")),
+            reverse=True,
+        )
+
+    def restore_memory_version(self, version_name: str) -> bool:
+        if Path(version_name).name != version_name:
+            return False
+        version_path = self.memory_versions_dir / version_name
+        if not version_path.is_file() or not version_name.startswith("MEMORY."):
+            return False
+        self.update_memory_md(version_path.read_text(encoding="utf-8"))
+        self.append_history(f"memory_restore: 恢复版本 {version_name}")
+        return True
+
+    @staticmethod
+    def _atomic_write(path: Path, content: str) -> None:
+        temp_path = path.with_name(f".{path.name}.tmp-{os.getpid()}-{uuid.uuid4().hex}")
+        try:
+            with temp_path.open("w", encoding="utf-8", newline="") as handle:
+                handle.write(content)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temp_path, path)
+        finally:
+            if temp_path.exists():
+                temp_path.unlink()
 
     def get_pending(self) -> str:
         return self._pending_path.read_text(encoding="utf-8") if self._pending_path.exists() else ""
@@ -355,7 +393,12 @@ class MemoryEngine:
             result = await llm_call(prompt)
             result = result.strip()
 
-            if not result or result == "无" or len(result) < 5:
+            if (
+                not result
+                or result == "无"
+                or len(result) < 5
+                or result.lstrip().startswith(("调用失败", "错误:", "错误："))
+            ):
                 return None
 
             self.append_pending(result)

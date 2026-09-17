@@ -16,9 +16,9 @@ from PyQt6.QtCore import Qt, QTimer, QPoint, QRect, QRectF, pyqtSignal, QSize
 from PyQt6.QtGui import QPainter, QColor, QFont, QFontDatabase, QPen, QMouseEvent, QBrush, QPainterPath
 
 DEFAULT_MODES = {
-    "work": {"label": "专注", "minutes": 25, "color": "#FF6B6B"},
-    "short": {"label": "短休", "minutes": 5, "color": "#4ECDC4"},
-    "long": {"label": "长休", "minutes": 15, "color": "#45B7D1"},
+    "work": {"label": "专注", "minutes": 25, "color": "#E46B48"},
+    "short": {"label": "短休", "minutes": 5, "color": "#D99068"},
+    "long": {"label": "长休", "minutes": 15, "color": "#B9785A"},
 }
 
 
@@ -35,7 +35,7 @@ class CircleProgress(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._progress = 1.0
-        self._color = QColor("#FF6B6B")
+        self._color = QColor("#E46B48")
         self.setMinimumSize(200, 200)
         self.setMaximumSize(260, 260)
 
@@ -51,7 +51,7 @@ class CircleProgress(QWidget):
         rect = QRect(8, 8, self.width() - 16, self.height() - 16)
 
         # background ring
-        pen = QPen(QColor("#FFE4E9"))
+        pen = QPen(QColor("#F0DCC8"))
         pen.setWidth(12)
         pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         painter.setPen(pen)
@@ -125,9 +125,12 @@ class TomatoTimer(QWidget):
         header.addWidget(self._title)
         header.addStretch()
 
-        self._close_btn = QPushButton("✕")
+        # Use the standard multiplication sign for a clear, universally
+        # rendered close/exit icon (some fonts render heavy cross glyphs oddly).
+        self._close_btn = QPushButton("×")
         self._close_btn.setObjectName("iconBtn")
         self._close_btn.setFixedSize(24, 24)
+        self._close_btn.setToolTip("关闭番茄钟")
         self._close_btn.clicked.connect(self.hide)
         header.addWidget(self._close_btn)
         layout.addLayout(header)
@@ -233,13 +236,13 @@ class TomatoTimer(QWidget):
     def _stylesheet(self):
         return """
             #container {
-                background: rgba(255, 255, 255, 245);
-                border: 1px solid rgba(255, 182, 193, 100);
+                background: rgba(252, 246, 235, 248);
+                border: 1px solid rgba(228, 107, 72, 120);
                 border-radius: 18px;
             }
             QLabel {
                 background: transparent;
-                color: #5A4A4A;
+                color: #4A372E;
                 font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
             }
             QPushButton {
@@ -253,21 +256,21 @@ class TomatoTimer(QWidget):
                 font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
             }
             QPushButton:checked {
-                background: #FF6B6B;
+                background: #E46B48;
                 color: white;
             }
             QPushButton:hover {
-                background: rgba(255, 107, 107, 0.1);
+                background: rgba(228, 107, 72, 0.12);
             }
             #title {
                 font-size: 15px;
                 font-weight: bold;
-                color: #FF6B6B;
+                color: #E66042;
             }
             #timeLabel {
                 font-size: 36px;
                 font-weight: bold;
-                color: #FF6B6B;
+                color: #E66042;
             }
             #statusLabel {
                 font-size: 12px;
@@ -280,22 +283,22 @@ class TomatoTimer(QWidget):
             #taskTitle {
                 font-size: 13px;
                 font-weight: bold;
-                color: #FF6B6B;
+                color: #E66042;
                 margin-top: 4px;
             }
             #primaryBtn {
-                background: #FF6B6B;
+                background: #E46B48;
                 color: white;
             }
             #primaryBtn:hover {
-                background: #FF8585;
+                background: #E66042;
             }
             #secondaryBtn {
-                background: #FFF0F3;
-                color: #FF6B6B;
+                background: #F7EBDD;
+                color: #C95138;
             }
             #secondaryBtn:hover {
-                background: #FFE4E9;
+                background: #F0DCC8;
             }
             #successBtn {
                 background: #4ECDC4;
@@ -305,35 +308,37 @@ class TomatoTimer(QWidget):
                 background: #6EDDD6;
             }
             #dangerBtn {
-                background: #FFE4E9;
-                color: #FF6B6B;
+                background: #F7EBDD;
+                color: #C95138;
             }
             #dangerBtn:hover {
-                background: #FFD0DA;
+                background: #F0DCC8;
             }
             #iconBtn {
                 background: transparent;
-                color: #999999;
+                color: #7B5144;
+                border: 1px solid #E8B19A;
+                background: #F7EBDD;
                 font-size: 13px;
             }
             #iconBtn:hover {
-                background: #FFE4E9;
-                color: #FF6B6B;
+                background: #E46B48;
+                color: #FFFFFF;
             }
             QLineEdit {
-                background: #FFF8F9;
-                border: 1px solid #FFD0DA;
+                background: #FFFCF6;
+                border: 1px solid #E8B19A;
                 border-radius: 8px;
                 padding: 6px;
                 color: #5A4A4A;
                 font-size: 12px;
             }
             QLineEdit:focus {
-                border: 1px solid #FF6B6B;
+                border: 1px solid #E46B48;
             }
             #taskList {
-                background: #FFF8F9;
-                border: 1px solid #FFE4E9;
+                background: #FFFCF6;
+                border: 1px solid #F0DCC8;
                 border-radius: 10px;
                 padding: 4px;
                 outline: none;
@@ -345,8 +350,8 @@ class TomatoTimer(QWidget):
                 margin: 1px 0px;
             }
             #taskList::item:selected {
-                background: #FFE4E9;
-                color: #FF6B6B;
+                background: #F7EBDD;
+                color: #C95138;
             }
         """
 
@@ -409,6 +414,13 @@ class TomatoTimer(QWidget):
         if not skipped and self._mode == "work":
             self._today_minutes += DEFAULT_MODES["work"]["minutes"]
             self._increment_active_task_pomodoro()
+            if self.pet is not None and hasattr(self.pet, "sys"):
+                if hasattr(self.pet.sys, "boost_mood"):
+                    self.pet.sys.boost_mood(8)
+                if hasattr(self.pet, "set_animation"):
+                    self.pet.set_animation("happy", 2200)
+                if hasattr(self.pet.sys, "boost_bond"):
+                    self.pet.sys.boost_bond(2)
             self._notify("专注时间结束！休息一下吧喵~ 🍅")
             self._set_mode("short")
         elif not skipped and self._mode in ("short", "long"):
@@ -503,9 +515,9 @@ class TomatoTimer(QWidget):
         from PyQt6.QtWidgets import QMenu
         menu = QMenu(self._task_list)
         menu.setStyleSheet("""
-            QMenu { background: white; border: 1px solid #FFD0DA; border-radius: 8px; padding: 4px; }
-            QMenu::item { padding: 6px 20px; border-radius: 6px; color: #5A4A4A; }
-            QMenu::item:selected { background: #FFE4E9; color: #FF6B6B; }
+            QMenu { background: #FCF6EB; border: 1px solid #E8B19A; border-radius: 8px; padding: 4px; }
+            QMenu::item { padding: 6px 20px; border-radius: 6px; color: #4A372E; }
+            QMenu::item:selected { background: #F7EBDD; color: #C95138; }
         """)
         action_done = menu.addAction("✓ 切换完成状态")
         action_delete = menu.addAction("🗑 删除任务")

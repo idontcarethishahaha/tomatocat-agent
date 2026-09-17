@@ -31,6 +31,7 @@ except ImportError:
     ZoneInfo = None  # type: ignore
 
 from .checkpoint import CheckpointManager
+from .task_store import TaskStore
 
 logger = logging.getLogger(__name__)
 
@@ -289,6 +290,7 @@ class SchedulerService:
         default_tz: str = "Asia/Shanghai",  # 避免和 datetime.timezone 重名
         tracker: LatencyTracker | None = None,
         checkpoint_manager: CheckpointManager | None = None,
+        task_store: TaskStore | None = None,
     ) -> None:
         self.store_path = Path(store_path)
         self.store_path.parent.mkdir(parents=True, exist_ok=True)
@@ -297,10 +299,12 @@ class SchedulerService:
         self.default_tz = default_tz  # 避免和 datetime.timezone 重名
         self.tracker = tracker or LatencyTracker()
         self._checkpoint_manager = checkpoint_manager
+        self._task_store = task_store
         self._jobs: dict[str, ScheduledJob] = {}
         self._in_flight: set[str] = set()
         self._running = False
         self._task: asyncio.Task | None = None
+        self._execution_tasks: set[asyncio.Task[None]] = set()
 
     # ── Public API ───────────────────────────────────────────────
 
@@ -322,6 +326,11 @@ class SchedulerService:
             except asyncio.CancelledError:
                 pass
             self._task = None
+        running = list(self._execution_tasks)
+        for task in running:
+            task.cancel()
+        if running:
+            await asyncio.gather(*running, return_exceptions=True)
         logger.info("[scheduler] 定时任务服务已停止")
 
     def add_job(
@@ -428,11 +437,16 @@ class SchedulerService:
                     label, job.mode, job.channel, job.chat_id,
                 )
                 self._in_flight.add(job.id)
-                asyncio.create_task(self._execute_and_reschedule(job))
+                task = asyncio.create_task(self._execute_and_reschedule(job))
+                self._execution_tasks.add(task)
+                task.add_done_callback(self._execution_tasks.discard)
 
     async def _execute_and_reschedule(self, job: ScheduledJob) -> None:
         checkpoint_id = None
+        run_id = f"scheduler:{job.id}:{uuid.uuid4().hex}"
         try:
+            if self._task_store:
+                self._task_store.create(run_id, "scheduler", payload=job.name or job.id, status="running")
             if self._checkpoint_manager:
                 checkpoint_id = self._checkpoint_manager.create(
                     task_type="scheduler",
@@ -452,13 +466,26 @@ class SchedulerService:
                 logger.info("[scheduler] 创建检查点: %s", checkpoint_id)
 
             await self._execute(job)
+            if self._task_store:
+                self._task_store.update(run_id, "completed", result="ok", expected_status="running")
             job.run_count += 1
 
             if self._checkpoint_manager and checkpoint_id:
                 self._checkpoint_manager.mark_completed(checkpoint_id, "任务执行成功")
                 logger.info("[scheduler] 检查点已完成: %s", checkpoint_id)
 
+        except asyncio.CancelledError:
+            if self._task_store:
+                self._task_store.update(
+                    run_id,
+                    "failed",
+                    error="scheduler stopped during execution",
+                    expected_status="running",
+                )
+            raise
         except Exception as e:
+            if self._task_store:
+                self._task_store.update(run_id, "failed", error=str(e), expected_status="running")
             logger.error("[scheduler] 任务 %s 执行失败: %s", job.id[:8], e, exc_info=True)
             if self._checkpoint_manager and checkpoint_id:
                 self._checkpoint_manager.create(

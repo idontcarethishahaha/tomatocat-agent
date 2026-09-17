@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 import os
 import re
@@ -17,33 +19,18 @@ class SkillsLoader:
     def list_skills(self, filter_unavailable: bool = True) -> list[dict[str, str]]:
         skills = []
 
-        if self.workspace_skills.exists():
-            for skill_dir in self.workspace_skills.iterdir():
-                if skill_dir.is_dir():
-                    skill_file = skill_dir / "SKILL.md"
-                    if skill_file.exists():
-                        skills.append(
-                            {
-                                "name": skill_dir.name,
-                                "path": str(skill_file),
-                                "source": "workspace",
-                            }
-                        )
+        def discover(root: Path, source: str) -> None:
+            if not root or not root.exists():
+                return
+            for skill_file in root.rglob("SKILL.md"):
+                relative = skill_file.parent.relative_to(root).as_posix()
+                if relative == ".":
+                    continue
+                if not any(s["name"] == relative for s in skills):
+                    skills.append({"name": relative, "path": str(skill_file), "source": source})
 
-        if self.builtin_skills and self.builtin_skills.exists():
-            for skill_dir in self.builtin_skills.iterdir():
-                if skill_dir.is_dir():
-                    skill_file = skill_dir / "SKILL.md"
-                    if skill_file.exists() and not any(
-                        s["name"] == skill_dir.name for s in skills
-                    ):
-                        skills.append(
-                            {
-                                "name": skill_dir.name,
-                                "path": str(skill_file),
-                                "source": "builtin",
-                            }
-                        )
+        discover(self.workspace_skills, "workspace")
+        discover(self.builtin_skills, "builtin")
 
         if filter_unavailable:
             return [
@@ -52,6 +39,45 @@ class SkillsLoader:
                 if self._check_requirements(self._get_skill_config(s["name"]))
             ]
         return skills
+
+    def route_skills(self, query: str, limit: int = 3) -> list[dict[str, str | float]]:
+        """Deterministically select skills matching a request and their parents."""
+        query_lower = query.lower()
+        scored = []
+        for skill in self.list_skills(filter_unavailable=True):
+            meta = self.get_skill_metadata(skill["name"]) or {}
+            cfg = self._get_skill_config(skill["name"])
+            triggers = cfg.get("triggers", []) if isinstance(cfg, dict) else []
+            if isinstance(triggers, str):
+                triggers = [triggers]
+            haystack = " ".join([skill["name"], meta.get("description", ""), *map(str, triggers)]).lower()
+            score = sum(1.0 for token in set(re.findall(r"[\w-]+", query_lower)) if token in haystack)
+            score += sum(4.0 for trigger in triggers if str(trigger).lower().strip() in query_lower)
+            if cfg.get("parent") and score:
+                score += 0.25
+            if cfg.get("always"):
+                score += 0.1
+            if score:
+                scored.append({**skill, "score": score, "parent": str(cfg.get("parent", ""))})
+        scored.sort(key=lambda item: (-float(item["score"]), str(item["name"])))
+        return scored[: max(1, limit)]
+
+    def load_routed_skills(self, query: str, limit: int = 3) -> str:
+        routed = self.route_skills(query, limit=limit)
+        names = [str(item["name"]) for item in routed]
+        # Include parent skills so domain guidance always accompanies child skills.
+        for item in routed:
+            parent = str(item.get("parent", ""))
+            if parent and parent not in names and not parent.startswith("Dev/"):
+                candidate = f"Dev/{parent}"
+                if self.load_skill(candidate):
+                    parent = candidate
+            if parent and parent not in names:
+                names.append(parent)
+        router = "Dev"
+        if self.load_skill(router) and router not in names:
+            names.append(router)
+        return self.load_skills_for_context(names)
 
     def _check_requirements(self, skill_config: dict) -> bool:
         requires = skill_config.get("requires", {})
@@ -74,12 +100,12 @@ class SkillsLoader:
         return "\n\n---\n\n".join(parts) if parts else ""
 
     def load_skill(self, name: str) -> str | None:
-        workspace_skill = self.workspace_skills / name / "SKILL.md"
+        workspace_skill = self.workspace_skills / Path(name) / "SKILL.md"
         if workspace_skill.exists():
             return workspace_skill.read_text(encoding="utf-8")
 
         if self.builtin_skills:
-            builtin_skill = self.builtin_skills / name / "SKILL.md"
+            builtin_skill = self.builtin_skills / Path(name) / "SKILL.md"
             if builtin_skill.exists():
                 return builtin_skill.read_text(encoding="utf-8")
 
@@ -87,7 +113,7 @@ class SkillsLoader:
 
     def _strip_frontmatter(self, content: str) -> str:
         if content.startswith("---"):
-            match = re.match(r"^---\n.*?\n---\n", content, re.DOTALL)
+            match = re.match(r"^---\r?\n.*?\r?\n---\r?\n", content, re.DOTALL)
             if match:
                 return content[match.end() :].strip()
         return content
@@ -98,7 +124,7 @@ class SkillsLoader:
             return None
 
         if content.startswith("---"):
-            match = re.match(r"^---\n(.*?)\n---", content, re.DOTALL)
+            match = re.match(r"^---\r?\n(.*?)\r?\n---", content, re.DOTALL)
             if match:
                 metadata = {}
                 for line in match.group(1).split("\n"):

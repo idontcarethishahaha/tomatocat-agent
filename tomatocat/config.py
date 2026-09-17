@@ -116,6 +116,34 @@ class Config:
     server: ServerConfig = field(default_factory=ServerConfig)
     plugins_dir: Path = Path("plugins")
 
+    def validate(self) -> list[str]:
+        """Return actionable configuration errors without starting services."""
+        errors: list[str] = []
+        if self.channels.cli.enabled:
+            try:
+                host, port = self.channels.cli.socket.rsplit(":", 1)
+                if not host or not (1 <= int(port) <= 65535):
+                    raise ValueError
+            except (ValueError, TypeError):
+                errors.append("channels.cli.socket must be HOST:PORT with a valid port")
+        if self.channels.telegram.enabled and not self.channels.telegram.token:
+            errors.append("channels.telegram.token is required when Telegram is enabled")
+        if self.channels.qq.enabled and not self.channels.qq.bot_uin:
+            errors.append("channels.qq.bot_uin is required when QQ is enabled")
+        if self.memory.memory_window < 1:
+            errors.append("memory.memory_window must be greater than zero")
+        if not (1 <= self.server.port <= 65535):
+            errors.append("server.port must be between 1 and 65535")
+        if self.proactive.enabled:
+            if not self.proactive.target.channel or not self.proactive.target.chat_id:
+                errors.append("proactive.target.channel and chat_id are required when proactive is enabled")
+        return errors
+
+    def validate_or_raise(self) -> None:
+        errors = self.validate()
+        if errors:
+            raise ValueError("Invalid configuration:\n- " + "\n- ".join(errors))
+
     @classmethod
     def load(cls, path: str | Path = "config.toml") -> Config:
         path = Path(path)

@@ -27,6 +27,7 @@ class MCPServerConnection:
         self._request_id = 0
         self._pending: dict[int, asyncio.Future] = {}
         self._read_task: asyncio.Task | None = None
+        self._stderr_task: asyncio.Task | None = None
         self._lock = asyncio.Lock()
         self._initialized = False
 
@@ -44,6 +45,7 @@ class MCPServerConnection:
         )
 
         self._read_task = asyncio.create_task(self._read_loop())
+        self._stderr_task = asyncio.create_task(self._read_stderr_loop())
         await self._initialize()
         self._initialized = True
         log.info(f"[mcp] {self.name} 已启动")
@@ -77,6 +79,27 @@ class MCPServerConnection:
             pass
         except Exception as e:
             log.warning(f"[mcp] {self.name} 读取错误: {e}")
+        finally:
+            for request_id, future in list(self._pending.items()):
+                if not future.done():
+                    future.set_exception(RuntimeError(f"MCP server {self.name} disconnected"))
+                self._pending.pop(request_id, None)
+
+    async def _read_stderr_loop(self) -> None:
+        assert self._proc is not None
+        assert self._proc.stderr is not None
+        try:
+            while True:
+                line = await self._proc.stderr.readline()
+                if not line:
+                    break
+                text = line.decode("utf-8", errors="replace").rstrip()
+                if text:
+                    log.warning("[mcp:%s] %s", self.name, text)
+        except asyncio.CancelledError:
+            pass
+        except Exception as exc:
+            log.warning("[mcp] %s stderr 读取错误: %s", self.name, exc)
 
     async def _send_request(self, method: str, params: dict | None = None) -> Any:
         if self._proc is None or self._proc.stdin is None:
@@ -153,24 +176,41 @@ class MCPServerConnection:
             "name": tool_name,
             "arguments": arguments,
         })
+        # MCP servers may return text in `content` or structured output in
+        # `structuredContent` (the latter is used by newer FastMCP versions).
+        if isinstance(result, str):
+            return result
+        if not isinstance(result, dict):
+            return str(result) if result is not None else ""
         content = result.get("content", [])
         parts = []
         for c in content:
-            if isinstance(c, dict) and "text" in c:
+            if isinstance(c, dict) and c.get("type") == "text" and "text" in c:
+                parts.append(c["text"])
+            elif isinstance(c, dict) and "text" in c:
                 parts.append(c["text"])
             elif hasattr(c, "text"):
                 parts.append(c.text)
             else:
                 parts.append(str(c))
-        return "\n".join(parts)
+        if parts:
+            return "\n".join(parts)
+        structured = result.get("structuredContent")
+        if structured is not None:
+            if isinstance(structured, str):
+                return structured
+            # Preserve JSON output for callers such as ProactiveEngine.
+            return json.dumps(structured, ensure_ascii=False)
+        return ""
 
     async def close(self) -> None:
-        if self._read_task:
-            self._read_task.cancel()
-            try:
-                await self._read_task
-            except Exception:
-                pass
+        tasks = [task for task in (self._read_task, self._stderr_task) if task]
+        for task in tasks:
+            task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        self._read_task = None
+        self._stderr_task = None
 
         if self._proc:
             try:
@@ -179,6 +219,7 @@ class MCPServerConnection:
             except Exception:
                 try:
                     self._proc.kill()
+                    await self._proc.wait()
                 except Exception:
                     pass
             self._proc = None
@@ -217,6 +258,7 @@ class MCPClient:
             return []
 
         for name, server_cfg in servers_cfg.items():
+            conn = None
             try:
                 command = server_cfg.get("command", [])
                 env = server_cfg.get("env")
@@ -236,6 +278,8 @@ class MCPClient:
                 log.info(f"[mcp] 已连接: {name} ({len(tools)} 个工具)")
             except Exception as e:
                 log.warning(f"[mcp] 连接服务器 {name} 失败: {e}")
+                if conn is not None:
+                    await conn.close()
 
         self._started = True
         log.info(f"[mcp] 已连接 {len(self._servers)} 个服务器，共 {len(self._tools)} 个工具")

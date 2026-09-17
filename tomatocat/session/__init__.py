@@ -71,6 +71,10 @@ class Session:
         if len(self.messages) > self.max_history:
             system_msg = self.messages[0] if self.messages and self.messages[0].role == "system" else None
             remaining = self.messages[-(self.max_history - 1):] if system_msg else self.messages[-self.max_history:]
+            # A tool result is only valid when the preceding assistant tool-call
+            # message is present. Drop orphaned results at the truncation edge.
+            while remaining and remaining[0].role == "tool":
+                remaining.pop(0)
             self.messages = ([system_msg] if system_msg else []) + remaining
 
 

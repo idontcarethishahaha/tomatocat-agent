@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
@@ -15,6 +16,7 @@ from tomatocat.core.memory.engine import (
     MemoryRecord,
     MemoryMutation,
     MemoryMutationResult,
+    MemoryScope,
 )
 from tomatocat.memory2.store import VectorMemoryStore, MemoryHit
 from tomatocat.memory2.embedder import Embedder
@@ -69,41 +71,54 @@ class DefaultMemoryEngine(MemoryEngine):
         logger.info("[memory] 文件记忆引擎已初始化")
 
     async def ingest(self, request: MemoryIngestRequest) -> MemoryIngestResult:
-        if not self._embedder:
-            return MemoryIngestResult(accepted=False, raw={"reason": "embedding disabled"})
-
         try:
             content = str(request.content)
             summary = content[:100]
-
-            embedding = await self._embedder.embed(content)
+            embedding = None
+            embedding_error = ""
+            if self._embedder:
+                try:
+                    embedding = await self._embedder.embed(content)
+                except Exception as exc:
+                    embedding_error = str(exc)
+                    logger.warning("[memory] embedding 失败，先保存结构化记忆: %s", exc)
             memory_type = request.hints.get("memory_type", "general")
+            confidence = _clamp_score(request.hints.get("confidence", 1.0))
+            source_trust = _clamp_score(
+                request.hints.get("source_trust", _source_trust(request.source_kind))
+            )
 
-            item_id = await self._vec_store.add(
+            item = await self._vec_store.add(
                 memory_type=str(memory_type),
                 summary=summary,
                 embedding=embedding,
                 extra=dict(request.metadata),
                 source_ref=request.hints.get("source_ref", ""),
+                happened_at=request.hints.get("happened_at") or datetime.now().astimezone().isoformat(),
+                session_key=request.scope.session_key,
+                source_kind=request.source_kind,
+                confidence=confidence,
+                source_trust=source_trust,
             )
 
             if self._event_bus:
                 from tomatocat.bus import MemoryWritten
                 self._event_bus.enqueue(
                     MemoryWritten(
-                        session_key="",
+                        session_key=request.scope.session_key,
                         source_ref=request.hints.get("source_ref", "ingest"),
                         action="write",
                         memory_type=str(memory_type),
-                        item_id=item_id,
+                        item_id=item.id,
                         summary=summary,
                     )
                 )
 
             return MemoryIngestResult(
                 accepted=True,
-                created_ids=[item_id],
+                created_ids=[item.id],
                 summary=summary,
+                raw={"embedding_error": embedding_error} if embedding_error else {},
             )
         except Exception as e:
             logger.error("[memory] ingest 失败: %s", e)
@@ -118,6 +133,7 @@ class DefaultMemoryEngine(MemoryEngine):
                 request.text,
                 intent=request.intent,
                 limit=request.limit,
+                session_key=request.scope.session_key,
             )
 
             records = []
@@ -176,7 +192,8 @@ class DefaultMemoryEngine(MemoryEngine):
             ingest_result = await self.ingest(MemoryIngestRequest(
                 content=request.summary,
                 source_kind="manual",
-                hints={"memory_type": request.memory_kind},
+                scope=request.scope,
+                hints={"memory_type": request.memory_kind, "source_ref": request.source_ref},
                 metadata=dict(request.metadata),
             ))
             if ingest_result.accepted:
@@ -188,14 +205,18 @@ class DefaultMemoryEngine(MemoryEngine):
             return MemoryMutationResult(accepted=False)
 
         elif request.kind == "forget":
-            deleted_count = 0
+            deleted_ids = []
             for item_id in request.ids:
-                if self._vec_store.delete(item_id):
-                    deleted_count += 1
+                if self._vec_store.delete(
+                    item_id,
+                    session_key=request.scope.session_key or None,
+                ):
+                    deleted_ids.append(item_id)
             return MemoryMutationResult(
-                accepted=True,
-                affected_ids=list(request.ids),
-                status="deleted",
+                accepted=bool(deleted_ids),
+                affected_ids=deleted_ids,
+                missing_ids=[item_id for item_id in request.ids if item_id not in deleted_ids],
+                status="deleted" if deleted_ids else "not_found",
             )
 
         return MemoryMutationResult(accepted=False)
@@ -213,6 +234,7 @@ class DefaultMemoryEngine(MemoryEngine):
         q: str = "",
         memory_type: str = "",
         status: str = "",
+        session_key: str | None = None,
         page: int = 1,
         page_size: int = 50,
         sort_by: str = "created_at",
@@ -222,13 +244,26 @@ class DefaultMemoryEngine(MemoryEngine):
             query=q,
             memory_type=memory_type,
             status=status,
+            session_key=session_key,
             page=page,
             page_size=page_size,
         )
-        return items, len(items)
+        total = self._vec_store.count(
+            memory_type or None,
+            status=status,
+            query=q,
+            session_key=session_key,
+        )
+        return items, total
 
     def delete_item(self, item_id: str) -> bool:
         return self._vec_store.delete(item_id)
+
+    def list_memory_versions(self) -> list[str]:
+        return self._file_memory.list_memory_versions()
+
+    def restore_memory_version(self, version_name: str) -> bool:
+        return self._file_memory.restore_memory_version(version_name)
 
     async def consolidate(self) -> bool:
         try:
@@ -251,11 +286,81 @@ class DefaultMemoryEngine(MemoryEngine):
         user_text: str,
         assistant_text: str,
         llm_call,
+        scope: MemoryScope | None = None,
     ) -> str | None:
-        return await self._file_memory.extract_and_pending(user_text, assistant_text, llm_call)
+        extracted = await self._file_memory.extract_and_pending(
+            user_text,
+            assistant_text,
+            llm_call,
+        )
+        if not extracted:
+            return None
+
+        active_scope = scope or MemoryScope()
+        for summary in _parse_extracted_memories(extracted):
+            await self.ingest(MemoryIngestRequest(
+                content=summary,
+                source_kind="conversation_extract",
+                scope=active_scope,
+                hints={
+                    "memory_type": _infer_memory_type(summary),
+                    "source_ref": "post_conversation",
+                    "confidence": 0.75,
+                    "source_trust": 0.8,
+                },
+                metadata={
+                    "channel": active_scope.channel,
+                    "chat_id": active_scope.chat_id,
+                },
+            ))
+        return extracted
 
     def tick_conversation(self) -> bool:
         return self._file_memory.tick_conversation()
 
     def reset_conversation_counter(self) -> None:
         self._file_memory.reset_conversation_counter()
+
+    async def close(self) -> None:
+        self._vec_store.close()
+        if self._embedder is not None:
+            await self._embedder.close()
+
+
+def _clamp_score(value: object) -> float:
+    try:
+        return max(0.0, min(float(value), 1.0))
+    except (TypeError, ValueError):
+        return 1.0
+
+
+def _source_trust(source_kind: str) -> float:
+    return {
+        "manual": 1.0,
+        "conversation_extract": 0.8,
+        "import": 0.7,
+    }.get(source_kind, 0.75)
+
+
+def _parse_extracted_memories(text: str) -> list[str]:
+    memories = []
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if line.startswith(("- ", "* ")):
+            line = line[2:].strip()
+        else:
+            line = re.sub(r"^\d+[.、)]\s*", "", line)
+        if line and line != "无" and not line.startswith("#"):
+            memories.append(line)
+    return list(dict.fromkeys(memories))
+
+
+def _infer_memory_type(summary: str) -> str:
+    lowered = summary.lower()
+    if any(token in lowered for token in ("喜欢", "偏好", "习惯", "不喜欢", "prefer", "like")):
+        return "preference"
+    if any(token in lowered for token in ("步骤", "流程", "方法", "procedure")):
+        return "procedure"
+    if any(token in lowered for token in ("发生", "去了", "完成", "event", "visited")):
+        return "event"
+    return "profile"

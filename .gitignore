@@ -1,5 +1,7 @@
 # 配置文件（含密钥）
 config.toml
+diff.md
+_test_embedding.py
 
 # Python 缓存
 __pycache__/
@@ -14,6 +16,7 @@ venv/
 # IDE
 .vscode/
 .idea/
+.trae/
 *.swp
 *.swo
 *~
@@ -21,9 +24,22 @@ venv/
 # 系统文件
 .DS_Store
 Thumbs.db
+*.lnk
 
 # uv 缓存
 .uv/
+
+# 运行时日志和状态
+logs/
+mcp/**/ack_state.json
+mcp/**/last_fetch.json
+tomato_timer_state.json
+workspace-test/
+.tomatocat.lock
+.pet-lock
+
+# 本机启动配置
+startup/TomatoCat-Desktop.cmd
 
 面试介绍.md
 面试介绍-口述版.txt

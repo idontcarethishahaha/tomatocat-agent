@@ -80,7 +80,7 @@ def _derive_params_schema(func: Callable[..., Any]) -> dict[str, Any]:
     required: list[str] = []
 
     for pname, param in sig.parameters.items():
-        if pname in ("self", "event", "cls"):
+        if pname in ("self", "event", "cls") or pname.startswith("_"):
             continue
 
         if param.kind == inspect.Parameter.VAR_KEYWORD:

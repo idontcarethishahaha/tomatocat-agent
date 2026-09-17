@@ -19,7 +19,30 @@ dependencies = [
 ]
 
 [project.scripts]
-tomatocat = "tomatocat.main:main"
+tomatocat = "main:main"
+
+[tool.setuptools]
+py-modules = [
+    "main",
+    "chat_dialog",
+    "config_mgr",
+    "error_log",
+    "file_handler",
+    "pet_systems",
+    "pet_window",
+    "sprites",
+    "tomato_timer",
+]
+
+[tool.setuptools.packages.find]
+include = ["tomatocat*", "plugins*", "skills*"]
+namespaces = true
+
+[tool.setuptools.package-data]
+skills = [
+    "skill-creater/SKILL.md",
+    "summarize/SKILL.md",
+]
 
 [dependency-groups]
 dev = [

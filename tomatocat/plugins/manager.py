@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 import importlib.util
+import inspect
 import logging
 import sys
 from pathlib import Path
@@ -126,9 +127,23 @@ class PluginManager:
             return f"错误：未找到工具 '{tool_name}'"
 
         call_kwargs = dict(arguments)
-        if session_key:
+        # 会话上下文是管理器内部元数据，不是所有工具都声明了对应参数。
+        # 仅向显式接收该参数（或声明 **kwargs）的工具透传，避免普通工具
+        # 因 unexpected keyword argument 失败（例如 web_search/web_fetch）。
+        try:
+            signature = inspect.signature(tool_info.func)
+            parameters = signature.parameters
+            accepts_kwargs = any(
+                p.kind == inspect.Parameter.VAR_KEYWORD
+                for p in parameters.values()
+            )
+        except (TypeError, ValueError):
+            parameters = {}
+            accepts_kwargs = True
+
+        if session_key and (accepts_kwargs or "_session_key" in parameters):
             call_kwargs["_session_key"] = session_key
-        if channel:
+        if channel and (accepts_kwargs or "_channel" in parameters):
             call_kwargs["_channel"] = channel
 
         # MCP 工具（plugin_id="mcp"）直接调用，不需要插件实例

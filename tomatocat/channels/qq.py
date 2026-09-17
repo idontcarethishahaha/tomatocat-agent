@@ -271,8 +271,10 @@ class QQChannel(Channel):
 
     async def send_message(self, chat_id: str, text: str) -> None:
         """发送主动消息"""
-        if not text or not self._api:
+        if not text:
             return
+        if not self._api or self._bot_loop is None:
+            raise RuntimeError("qq sender is not initialized")
         raw = str(chat_id)
         if raw.startswith("qq:"):
             raw = raw[3:]
@@ -306,7 +308,7 @@ class QQChannel(Channel):
 
     async def _send_private_text(self, user_id: str, text: str) -> None:
         if not self._api or self._bot_loop is None:
-            return
+            raise RuntimeError("qq sender is not initialized")
         try:
             msg_segments = [{"type": "text", "data": {"text": text}}]
             fut = asyncio.run_coroutine_threadsafe(
@@ -316,10 +318,11 @@ class QQChannel(Channel):
             await asyncio.wrap_future(fut)
         except Exception as e:
             logger.error("[qq] 私聊消息发送失败: %s", e)
+            raise
 
     async def _send_group_text(self, group_id: str, text: str) -> None:
         if not self._api or self._bot_loop is None:
-            return
+            raise RuntimeError("qq sender is not initialized")
         try:
             msg_segments = [{"type": "text", "data": {"text": text}}]
             fut = asyncio.run_coroutine_threadsafe(
@@ -329,10 +332,11 @@ class QQChannel(Channel):
             await asyncio.wrap_future(fut)
         except Exception as e:
             logger.error("[qq] 群聊消息发送失败: %s", e)
+            raise
 
     async def _send_private_image(self, user_id: str, image_path: str) -> None:
         if not self._api or self._bot_loop is None:
-            return
+            raise RuntimeError("qq sender is not initialized")
         try:
             fut = asyncio.run_coroutine_threadsafe(
                 self._api.send_private_image(user_id=user_id, image=image_path),
@@ -341,10 +345,11 @@ class QQChannel(Channel):
             await asyncio.wrap_future(fut)
         except Exception as e:
             logger.error("[qq] 私聊图片发送失败: %s", e)
+            raise
 
     async def _send_group_image(self, group_id: str, image_path: str) -> None:
         if not self._api or self._bot_loop is None:
-            return
+            raise RuntimeError("qq sender is not initialized")
         try:
             fut = asyncio.run_coroutine_threadsafe(
                 self._api.send_group_image(group_id=group_id, image=image_path),
@@ -353,6 +358,7 @@ class QQChannel(Channel):
             await asyncio.wrap_future(fut)
         except Exception as e:
             logger.error("[qq] 群聊图片发送失败: %s", e)
+            raise
 
     # ── 图片下载 ───────────────────────────────────────────────────
 

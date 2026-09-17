@@ -7,6 +7,7 @@ from PyQt6.QtGui import QFont, QMouseEvent
 import threading
 import json
 import asyncio
+from concurrent.futures import TimeoutError as FutureTimeoutError
 from pathlib import Path
 from html import escape as html_escape
 from config_mgr import load_config
@@ -26,19 +27,19 @@ def _get_chat_log_path():
     return Path(__file__).parent / "chat-history.json"
 
 _default_theme = {
-    "bg": "#FFFFFF",
-    "border": "#FFB6C1",
-    "title": "#FF6B9D",
-    "history_bg": "#FFF9FB",
-    "text_color": "#333333",
-    "input_bg": "#FFFFFF",
-    "input_border": "#FFB6C1",
-    "btn_bg": "#FFB6C1",
-    "btn_hover": "#FF9BB0",
-    "btn_pressed": "#FF8599",
+    "bg": "#FCF6EB",
+    "border": "#E46B48",
+    "title": "#E66042",
+    "history_bg": "#FFF9F1",
+    "text_color": "#4A372E",
+    "input_bg": "#FFFCF6",
+    "input_border": "#E8B19A",
+    "btn_bg": "#E46B48",
+    "btn_hover": "#E66042",
+    "btn_pressed": "#C95138",
     "btn_text": "#FFFFFF",
     "user_color": "#6FA8FF",
-    "assistant_color": "#FF6B9D",
+    "assistant_color": "#E66042",
 }
 
 
@@ -94,8 +95,10 @@ QPushButton#SendBtn:pressed {{ background: {t['btn_pressed']}; }}
 
 class ChatBubble(QWidget):
     closed = pyqtSignal()
-    _result_signal = pyqtSignal(dict)
-    _error_signal = pyqtSignal(str)
+    _result_signal = pyqtSignal(str, dict)
+    _error_signal = pyqtSignal(str, str)
+    _stream_signal = pyqtSignal(str, dict)
+    _status_signal = pyqtSignal(str, str)
 
     def __init__(self, parent=None, agent_context=None, agent_loop=None):
         super().__init__(parent)
@@ -105,10 +108,16 @@ class ChatBubble(QWidget):
         self.agent_loop = agent_loop
         self._history = []
         self._streaming = False
+        self._request_seq = 0
+        self._active_request_id = None
+        self._request_futures = {}
+        self._cancelled_requests = set()
         self._theme = _get_theme()
 
         self._result_signal.connect(self._on_result)
         self._error_signal.connect(self._on_error)
+        self._stream_signal.connect(self._on_stream_delta)
+        self._status_signal.connect(self._on_status)
 
         self._setup_ui()
         self._load_history()
@@ -132,7 +141,7 @@ class ChatBubble(QWidget):
         close_btn.setFixedSize(28, 28)
         close_btn.setStyleSheet(f"""
             QPushButton {{
-                background: transparent; color: #999; border: none;
+                background: #F7EBDD; color: #A94A35; border: 1px solid #E8B19A;
                 font-size: 16px; font-weight: bold;
                 border-radius: 14px;
             }}
@@ -157,11 +166,18 @@ class ChatBubble(QWidget):
 
         send_btn = QPushButton("发送")
         send_btn.setObjectName("SendBtn")
-        send_btn.clicked.connect(self._send_message)
+        send_btn.clicked.connect(self._send_or_stop)
 
         input_row.addWidget(self.input_box)
+        self.send_btn = send_btn
         input_row.addWidget(send_btn)
         layout.addLayout(input_row)
+
+    def _send_or_stop(self):
+        if self._streaming:
+            self._stop_generation()
+        else:
+            self._send_message()
 
     def _load_history(self):
         try:
@@ -234,31 +250,97 @@ class ChatBubble(QWidget):
         self._history.append({"role": "user", "content": text})
         self._save_history()
         self._streaming = True
+        self._stream_text = ""
+        self._request_seq += 1
+        request_id = str(self._request_seq)
+        self._active_request_id = request_id
+        self.send_btn.setText("停止")
 
         if self.agent_context and "agent" in self.agent_context and self.agent_loop:
             self._append_text("🐾 番茄猫", self._theme["assistant_color"], "思考中...")
-            threading.Thread(target=self._call_agent, args=(text,), daemon=True).start()
+            threading.Thread(
+                target=self._call_agent,
+                args=(request_id, text),
+                daemon=True,
+            ).start()
         else:
             self._append_text("🐾 番茄猫", self._theme["assistant_color"],
                               "（未配置 LLM，请编辑 config.toml）")
             self._streaming = False
+            self.send_btn.setText("发送")
             self.input_box.setEnabled(True)
 
-    def _call_agent(self, user_text):
+    def _call_agent(self, request_id, user_text):
+        future = None
         try:
+            async def _on_delta(channel, session_key, delta_type, delta):
+                if request_id in self._cancelled_requests:
+                    return
+                if delta_type == "streaming_delta":
+                    self._stream_signal.emit(request_id, dict(delta))
+                elif delta_type == "tool_call_start":
+                    self._status_signal.emit(request_id, "正在调用工具…")
+
             async def _agent_call():
                 result = await self.agent_context["agent"].handle_message(
-                    "desktop_chat", user_text, "desktop"
+                    "desktop_chat", user_text, "desktop", on_delta=_on_delta
                 )
                 return result
 
             future = asyncio.run_coroutine_threadsafe(_agent_call(), self.agent_loop)
+            self._request_futures[request_id] = future
+            if request_id in self._cancelled_requests:
+                future.cancel()
             result = future.result(timeout=120)
-            self._result_signal.emit(result)
+            if request_id not in self._cancelled_requests:
+                self._result_signal.emit(request_id, result)
+        except FutureTimeoutError:
+            if future is not None and not future.done():
+                future.cancel()
+            if request_id not in self._cancelled_requests:
+                self._error_signal.emit(request_id, "请求超时，已停止生成")
         except Exception as e:
-            self._error_signal.emit(str(e))
+            if request_id not in self._cancelled_requests:
+                self._error_signal.emit(request_id, str(e))
+        finally:
+            self._request_futures.pop(request_id, None)
+            self._cancelled_requests.discard(request_id)
 
-    def _on_result(self, result):
+    def _stop_generation(self):
+        if not self._streaming:
+            return
+        request_id = self._active_request_id
+        if request_id is None:
+            return
+        self._cancelled_requests.add(request_id)
+        future = self._request_futures.get(request_id)
+        if future is not None and not future.done():
+            future.cancel()
+        self._on_error(request_id, "已停止生成")
+
+    def _on_status(self, request_id, status):
+        if request_id == self._active_request_id and self._streaming and not self._stream_text:
+            self._replace_last_message(status)
+
+    def _replace_last_message(self, text):
+        cursor = self.history_view.textCursor()
+        cursor.movePosition(cursor.MoveOperation.End)
+        cursor.select(cursor.SelectionType.BlockUnderCursor)
+        cursor.removeSelectedText()
+        self.history_view.setTextCursor(cursor)
+        self._append_text("TomatoCat", self._theme["assistant_color"], text)
+
+    def _on_stream_delta(self, request_id, delta):
+        if request_id != self._active_request_id or not self._streaming:
+            return
+        content = delta.get("content_delta", "")
+        if content:
+            self._stream_text += content
+            self._replace_last_message(self._stream_text)
+
+    def _on_result(self, request_id, result):
+        if request_id != self._active_request_id or not self._streaming:
+            return
         text = result.get("text", "")
         media_paths = result.get("media_paths", [])
 
@@ -286,11 +368,15 @@ class ChatBubble(QWidget):
                 pass
 
         self._streaming = False
+        self._active_request_id = None
+        self.send_btn.setText("发送")
         self._history.append({"role": "assistant", "content": text})
         self._save_history()
         self.input_box.setEnabled(True)
 
-    def _on_error(self, err):
+    def _on_error(self, request_id, err):
+        if request_id != self._active_request_id or not self._streaming:
+            return
         cursor = self.history_view.textCursor()
         cursor.movePosition(cursor.MoveOperation.End)
         cursor.select(cursor.SelectionType.BlockUnderCursor)
@@ -299,6 +385,8 @@ class ChatBubble(QWidget):
 
         self._append_text("🐾 番茄猫", self._theme["assistant_color"], f"（出错了：{err}）")
         self._streaming = False
+        self._active_request_id = None
+        self.send_btn.setText("发送")
         self.input_box.setEnabled(True)
 
     def show_analysis(self, text):
@@ -325,16 +413,15 @@ class ChatBubble(QWidget):
     def eventFilter(self, obj, event):
         if event.type() == QEvent.Type.KeyPress:
             if event.key() == Qt.Key.Key_Escape:
-                self._dismiss()
-                return True
-        if event.type() == QEvent.Type.MouseButtonPress:
-            pos = self._event_global_pos(event)
-            if not self.geometry().contains(pos):
-                self._dismiss()
+                # Do not close the chat bubble via a background/keyboard
+                # click; closing is intentionally explicit via the top-right
+                # button.
                 return True
         return super().eventFilter(obj, event)
 
     def _dismiss(self):
+        if self._streaming:
+            self._stop_generation()
         from PyQt6.QtWidgets import QApplication
         app = QApplication.instance()
         if app:
@@ -343,6 +430,8 @@ class ChatBubble(QWidget):
         self.closed.emit()
 
     def closeEvent(self, event):
+        if self._streaming:
+            self._stop_generation()
         from PyQt6.QtWidgets import QApplication
         app = QApplication.instance()
         if app:

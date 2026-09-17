@@ -19,6 +19,16 @@ from fastapi.responses import FileResponse, JSONResponse
 logger = logging.getLogger(__name__)
 
 
+def _resolve_workspace_path(workspace: Path, requested: str) -> Path:
+    root = workspace.resolve()
+    target = (root / requested).resolve()
+    try:
+        target.relative_to(root)
+    except ValueError as exc:
+        raise HTTPException(status_code=403, detail="禁止访问工作区外的路径") from exc
+    return target
+
+
 class DashboardAPI:
     def __init__(
         self,
@@ -39,6 +49,7 @@ class DashboardAPI:
         self.port = port
         self._app: FastAPI | None = None
         self._thread: threading.Thread | None = None
+        self._server: Any = None
         self._running = False
         self._start_time = datetime.now()
         self._stats = {
@@ -52,8 +63,13 @@ class DashboardAPI:
 
         app.add_middleware(
             CORSMiddleware,
-            allow_origins=["*"],
-            allow_credentials=True,
+            allow_origins=[
+                f"http://127.0.0.1:{self.port}",
+                f"http://localhost:{self.port}",
+                "http://127.0.0.1:5173",
+                "http://localhost:5173",
+            ],
+            allow_credentials=False,
             allow_methods=["*"],
             allow_headers=["*"],
         )
@@ -103,7 +119,13 @@ class DashboardAPI:
             }
 
         @app.get("/api/memory")
-        async def get_memory(q: str = "", memory_type: str = "", page: int = 1, page_size: int = 20):
+        async def get_memory(
+            q: str = "",
+            memory_type: str = "",
+            session_key: str = "",
+            page: int = 1,
+            page_size: int = 20,
+        ):
             if not self.memory or not hasattr(self.memory, "list_items_for_dashboard"):
                 return {"items": [], "total": 0}
 
@@ -111,6 +133,7 @@ class DashboardAPI:
                 items, total = self.memory.list_items_for_dashboard(
                     q=q,
                     memory_type=memory_type,
+                    session_key=session_key or None,
                     page=page,
                     page_size=page_size,
                 )
@@ -134,6 +157,21 @@ class DashboardAPI:
             except Exception as e:
                 logger.error(f"[dashboard] 删除记忆失败: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
+
+        @app.get("/api/memory/versions")
+        async def get_memory_versions():
+            if not self.memory or not hasattr(self.memory, "list_memory_versions"):
+                return {"versions": [], "total": 0}
+            versions = self.memory.list_memory_versions()
+            return {"versions": versions, "total": len(versions)}
+
+        @app.post("/api/memory/versions/{version_name}/restore")
+        async def restore_memory_version(version_name: str):
+            if not self.memory or not hasattr(self.memory, "restore_memory_version"):
+                raise HTTPException(status_code=501, detail="记忆版本恢复功能不可用")
+            if not self.memory.restore_memory_version(version_name):
+                raise HTTPException(status_code=404, detail="记忆版本不存在")
+            return {"success": True, "version": version_name}
 
         @app.get("/api/skills")
         async def get_skills():
@@ -203,9 +241,7 @@ class DashboardAPI:
         @app.get("/api/files/list")
         async def list_files(path: str = ""):
             try:
-                target = self.workspace / path if path else self.workspace
-                if not str(target.resolve()).startswith(str(self.workspace.resolve())):
-                    raise HTTPException(status_code=403, detail="禁止访问工作区外的路径")
+                target = _resolve_workspace_path(self.workspace, path)
 
                 if not target.exists():
                     raise HTTPException(status_code=404, detail="路径不存在")
@@ -228,9 +264,7 @@ class DashboardAPI:
         @app.get("/api/files/read")
         async def read_file(path: str):
             try:
-                target = self.workspace / path
-                if not str(target.resolve()).startswith(str(self.workspace.resolve())):
-                    raise HTTPException(status_code=403, detail="禁止访问工作区外的路径")
+                target = _resolve_workspace_path(self.workspace, path)
 
                 if not target.exists() or not target.is_file():
                     raise HTTPException(status_code=404, detail="文件不存在")
@@ -283,23 +317,38 @@ class DashboardAPI:
         if frontend_dir.exists():
             self._app.mount("/assets", StaticFiles(directory=str(frontend_dir / "assets")), name="assets")
 
+        import uvicorn
+        config = uvicorn.Config(
+            app=self._app,
+            host=self.host,
+            port=self.port,
+            log_level="warning",
+        )
+        server = uvicorn.Server(config)
+        self._server = server
+        self._running = True
+
         def _run():
-            import uvicorn
-            self._running = True
-            config = uvicorn.Config(
-                app=self._app,
-                host=self.host,
-                port=self.port,
-                log_level="warning",
-            )
-            server = uvicorn.Server(config)
-            server.run()
+            try:
+                server.run()
+            finally:
+                self._running = False
 
         self._thread = threading.Thread(target=_run, daemon=True, name="dashboard")
         self._thread.start()
         logger.info(f"[dashboard] 仪表板已启动: http://{self.host}:{self.port}")
 
     def stop(self) -> None:
+        server = self._server
+        if server is not None:
+            server.should_exit = True
+        thread = self._thread
+        if thread and thread.is_alive() and thread is not threading.current_thread():
+            thread.join(timeout=5)
+            if thread.is_alive():
+                logger.warning("[dashboard] 仪表板未在超时内停止")
+        self._server = None
+        self._thread = None
         self._running = False
 
     def record_message(self) -> None:

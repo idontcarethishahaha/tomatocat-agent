@@ -6,6 +6,7 @@ import asyncio
 import base64
 import logging
 import mimetypes
+import re
 from datetime import datetime, timedelta, timezone as _tz_utc
 from pathlib import Path
 from typing import Any, Awaitable, Callable
@@ -23,6 +24,7 @@ from ..lifecycle import (
     AfterReasoningCtx,
     AfterTurnCtx,
 )
+from ..core.memory.engine import MemoryQuery, MemoryScope
 from .llm import LLMProvider, LLMResponse, ToolCall
 
 logger = logging.getLogger(__name__)
@@ -36,6 +38,72 @@ except ImportError:
 _VL_MAX_FILE_BYTES = 20 * 1024 * 1024
 _VL_MAX_DATA_URI_BYTES = 8 * 1024 * 1024
 _VL_MAX_EDGE = 4096
+
+
+# These messages are unambiguously conversational and do not benefit from
+# semantic memory retrieval. Keep this check local and conservative: anything
+# that is not an exact/near-exact match falls through to the normal pipeline.
+_SIMPLE_REPLY_RE = re.compile(
+    r"^(hi|hello|hey|你好|嗨|哈喽|早上好|下午好|晚上好|晚安|谢谢|感谢|好的|收到|ok|okay)"
+    r"[!！。,.，？?~～\s]*$",
+    re.IGNORECASE,
+)
+_MEMORY_HINTS = (
+    "记得", "上次", "之前", "刚才", "我的计划", "我的偏好", "我喜欢",
+    "我不喜欢", "提醒我", "继续", "按照我们", "我的生日", "我叫什么",
+    "你还记得我",
+)
+_TOOL_INTENT_HINTS = (
+    "搜索", "查找", "查询", "天气", "网页", "网址", "文件", "目录", "运行",
+    "命令", "执行", "提醒", "定时", "番茄钟", "论文", "下载", "计算",
+)
+_NO_TOOL_DESKTOP_RE = re.compile(
+    r"(聊聊天|陪我聊|讲个笑话|说个笑话|你好吗|你怎么样|无聊|开心|难过|晚安)",
+    re.IGNORECASE,
+)
+
+
+def _is_simple_message(text: str) -> bool:
+    """Return True only for short, deterministic conversational messages."""
+    normalized = re.sub(r"\s+", "", text).strip()
+    return len(normalized) <= 20 and bool(_SIMPLE_REPLY_RE.fullmatch(normalized))
+
+
+def _simple_reply(text: str) -> str:
+    normalized = re.sub(r"[!！。,.，？?~～\s]+", "", text).lower()
+    if normalized in {"hello", "hi", "hey", "你好", "嗨", "哈喽"}:
+        return "喵~ 你好呀！"
+    if normalized in {"ok", "okay", "好的", "收到"}:
+        return "好哒，收到喵~"
+    if normalized in {"谢谢", "感谢"}:
+        return "不客气喵~"
+    if normalized == "晚安":
+        return "晚安喵，做个好梦~"
+    if normalized in {"早上好", "下午好", "晚上好"}:
+        return f"{normalized}呀，喵~"
+    return "喵~ 我在呢！"
+
+
+def _should_search_memory(text: str) -> bool:
+    """Conservative memory routing; uncertain messages still search memory."""
+    normalized = re.sub(r"\s+", "", text).strip()
+    if any(hint in normalized for hint in _MEMORY_HINTS):
+        return True
+    return not _is_simple_message(normalized)
+
+
+def _tools_for_message(all_tools: list[dict[str, Any]], text: str, channel: str) -> list[dict[str, Any]]:
+    """Avoid sending a large tool schema for ordinary desktop conversation."""
+    if channel != "desktop":
+        return all_tools
+    normalized = re.sub(r"\s+", "", text)
+    if any(hint in normalized for hint in _TOOL_INTENT_HINTS):
+        return all_tools
+    if _NO_TOOL_DESKTOP_RE.search(normalized):
+        return []
+    # Unknown wording must retain capabilities; correctness takes precedence
+    # over the small prompt saving from removing tool schemas.
+    return all_tools
 
 
 def _detect_image_mime_from_header(head: bytes) -> str | None:
@@ -274,6 +342,7 @@ class TomatoCatAgent:
         # tool_loop_guard: 工具循环防护
         self._tool_call_history: dict[str, list[dict[str, Any]]] = {}
         self._tool_loop_threshold = 3
+        self._session_locks: dict[str, asyncio.Lock] = {}
 
         # context_pressure: 上下文压力管理
         self._context_token_limit = 12000  # Token 上限阈值
@@ -403,6 +472,39 @@ class TomatoCatAgent:
         on_delta: StreamDeltaFn | None = None,
         media_paths: list[str] | None = None,
     ) -> dict[str, Any]:
+        """Serialize each session and roll back partial history on cancellation."""
+        lock = self._session_locks.setdefault(session_key, asyncio.Lock())
+        async with lock:
+            session = self.session_manager.get_or_create(session_key)
+            messages_before_turn = list(session.messages)
+            tool_history_before_turn = list(self._tool_call_history.get(session_key, []))
+            try:
+                return await self._handle_message_impl(
+                    session_key=session_key,
+                    text=text,
+                    channel=channel,
+                    message_time=message_time,
+                    on_delta=on_delta,
+                    media_paths=media_paths,
+                )
+            except asyncio.CancelledError:
+                session.messages = messages_before_turn
+                if tool_history_before_turn:
+                    self._tool_call_history[session_key] = tool_history_before_turn
+                else:
+                    self._tool_call_history.pop(session_key, None)
+                logger.info("[agent] 回合已取消，会话已回滚: %s", session_key)
+                raise
+
+    async def _handle_message_impl(
+        self,
+        session_key: str,
+        text: str,
+        channel: str = "cli",
+        message_time: datetime | None = None,
+        on_delta: StreamDeltaFn | None = None,
+        media_paths: list[str] | None = None,
+    ) -> dict[str, Any]:
         """处理用户消息，返回最终回复
 
         Args:
@@ -442,27 +544,70 @@ class TomatoCatAgent:
 
         await self.event_bus.emit(TurnStartEvent(session_key))
 
-        if not session.messages:
+        # Fast path for greetings/acknowledgements. This avoids a model call,
+        # tool routing, embedding lookup, and post-turn memory extraction for
+        # messages whose intent is deterministic.
+        if _is_simple_message(text):
+            reply = _simple_reply(text)
+            session.add_user_message(text)
+            session.add_assistant_message(reply)
+            self.event_bus.enqueue(
+                AfterTurnCtx(
+                    session_key=session_key,
+                    channel=channel,
+                    chat_id=chat_id,
+                    reply=reply,
+                    tools_used=tuple(),
+                    thinking="",
+                    will_dispatch=True,
+                )
+            )
+            await self.event_bus.emit(TurnEndEvent(session_key, reply))
+            self.event_bus.enqueue(
+                TurnCommitted(
+                    session_key=session_key,
+                    input_message=text,
+                    assistant_response=reply,
+                    tools_used=[],
+                    thinking="",
+                )
+            )
+            return {"text": reply, "media_paths": [], "thinking": "", "tool_calls": []}
+
+        if not session.messages or session.messages[0].role != "system":
             system_prompt = self._build_system_with_memory()
+            if self.skills_loader:
+                try:
+                    routed = self.skills_loader.load_routed_skills(text)
+                    if routed:
+                        system_prompt += (
+                            "\n\n## 本回合技能路由\n"
+                            "以下技能根据用户请求匹配。遵循父技能流程，仅在需要时使用子技能细节，"
+                            "并按检查→实现→验证→风险执行。\n\n" + routed
+                        )
+                except Exception as e:
+                    logger.warning("[agent] 本回合技能路由失败: %s", e)
             system_prompt += build_current_session_prompt(channel=channel, chat_id=session_key)
             session.messages.insert(0, _system_message(system_prompt))
 
         retrieved_memory_block = ""
-        if self.memory:
+        if self.memory and _should_search_memory(text):
             try:
-                related = await self.memory.search(text, top_k=3)
-                if related:
-                    mem_text = "\n".join(f"- {r['content'][:80]}" for r in related)
-                    retrieved_memory_block = mem_text
-                    logger.info(f"[agent] 找到 {len(related)} 条相关记忆")
-                self.event_bus.enqueue(
-                    RetrievalCompleted(
-                        session_key=session_key,
-                        query=text,
-                        hits=related,
-                        injected_count=len(related),
+                memory_result = await self.memory.query(
+                    MemoryQuery(
+                        text=text,
+                        intent="answer",
+                        scope=MemoryScope(
+                            session_key=session_key,
+                            channel=channel,
+                            chat_id=chat_id,
+                        ),
+                        limit=3,
                     )
                 )
+                retrieved_memory_block = memory_result.text_block
+                if memory_result.records:
+                    logger.info("[agent] 找到 %d 条相关记忆", len(memory_result.records))
             except Exception as e:
                 self.event_bus.enqueue(
                     RetrievalCompleted(
@@ -472,6 +617,8 @@ class TomatoCatAgent:
                         error=str(e),
                     )
                 )
+        elif self.memory:
+            logger.debug("[agent] 跳过记忆检索：消息未表现出记忆相关意图")
 
         time_envelope = build_message_time_envelope(
             message_time,
@@ -499,7 +646,7 @@ class TomatoCatAgent:
         final_response = ""
         final_thinking = ""
         all_tool_calls: list[dict[str, Any]] = []
-        tools = self.plugin_manager.get_all_tools()
+        tools = _tools_for_message(self.plugin_manager.get_all_tools(), text, channel)
         tools_used_so_far: list[str] = []
         partial_reply = ""
 
@@ -537,6 +684,19 @@ class TomatoCatAgent:
             )
             prompt_render_ctx = await self.event_bus.emit(prompt_render_ctx)
 
+            rendered_messages = list(prompt_render_ctx.history)
+            context_parts = []
+            if prompt_render_ctx.retrieved_memory_block:
+                context_parts.append("## 与本轮相关的记忆\n" + prompt_render_ctx.retrieved_memory_block)
+            if prompt_render_ctx.extra_hints:
+                context_parts.append("## 本轮附加提示\n" + "\n".join(prompt_render_ctx.extra_hints))
+            if context_parts:
+                insert_at = 1 if rendered_messages and rendered_messages[0].get("role") == "system" else 0
+                rendered_messages.insert(insert_at, {
+                    "role": "system",
+                    "content": "\n\n".join(context_parts),
+                })
+
             before_step_ctx = BeforeStepCtx(
                 session_key=session_key,
                 channel=channel,
@@ -548,6 +708,14 @@ class TomatoCatAgent:
                 logger.info("[agent] before_step 提前终止，回复: %s", before_step_ctx.early_stop_reply)
                 final_response = before_step_ctx.early_stop_reply
                 break
+
+            step_tools = tools
+            if before_step_ctx.visible_tool_names is not None:
+                visible = before_step_ctx.visible_tool_names
+                step_tools = [
+                    tool for tool in tools
+                    if tool.get("function", {}).get("name") in visible
+                ]
 
             async def _delta(delta: dict[str, str]) -> None:
                 if on_delta:
@@ -570,8 +738,8 @@ class TomatoCatAgent:
                 logger.info("[agent] 使用视觉模型进行推理")
 
             response = await active_llm.chat(
-                messages=messages,
-                tools=tools if tools else None,
+                messages=rendered_messages,
+                tools=step_tools if step_tools else None,
                 max_tokens=self.config.agent.max_tokens,
                 on_delta=_delta if on_delta and iteration == 0 else None,
             )
@@ -596,7 +764,8 @@ class TomatoCatAgent:
                 tool_names = [tc.name for tc in response.tool_calls]
                 tools_used_so_far.extend(tool_names)
 
-                for tc in response.tool_calls:
+                stop_after_step = False
+                for tool_index, tc in enumerate(response.tool_calls):
                     # tool_loop_guard: 检测工具循环
                     loop_detected, loop_msg = self._check_tool_loop(session_key, tc.name, tc.arguments)
                     if loop_detected:
@@ -604,6 +773,13 @@ class TomatoCatAgent:
                         result = f"[tool_loop_guard] {loop_msg} 请尝试其他方法或向用户说明情况。"
                         session.add_tool_result(tc.id, tc.name, result)
                         final_response = "喵... 我好像陷入了循环，换个方式试试？"
+                        stop_after_step = True
+                        for skipped in response.tool_calls[tool_index + 1:]:
+                            session.add_tool_result(
+                                skipped.id,
+                                skipped.name,
+                                "[cancelled] 前序工具调用被安全策略终止，本调用未执行。",
+                            )
                         break
 
                     # shell_safety: 检查危险命令
@@ -613,6 +789,13 @@ class TomatoCatAgent:
                         result = f"[shell_safety] {safety_reason}"
                         session.add_tool_result(tc.id, tc.name, result)
                         final_response = "喵... 这个命令不安全，我不能执行哦~"
+                        stop_after_step = True
+                        for skipped in response.tool_calls[tool_index + 1:]:
+                            session.add_tool_result(
+                                skipped.id,
+                                skipped.name,
+                                "[cancelled] 前序工具调用被安全策略终止，本调用未执行。",
+                            )
                         break
 
                     tool_info = {"name": tc.name, "status": "running"}
@@ -643,9 +826,12 @@ class TomatoCatAgent:
                     tools_called=tuple(tool_names),
                     partial_reply=partial_reply,
                     tools_used_so_far=tuple(tools_used_so_far),
-                    has_more=True,
+                    has_more=not stop_after_step,
                 )
                 await self.event_bus.fanout(after_step_ctx)
+                if stop_after_step:
+                    session.add_assistant_message(final_response)
+                    break
                 continue
 
             if response.content:
@@ -698,7 +884,13 @@ class TomatoCatAgent:
             except Exception:
                 pass
 
-            asyncio.create_task(self._post_conversation_memory(text, final_response))
+            asyncio.create_task(self._post_conversation_memory(
+                text,
+                final_response,
+                session_key=session_key,
+                channel=channel,
+                chat_id=chat_id,
+            ))
 
         after_turn_ctx = AfterTurnCtx(
             session_key=session_key,
@@ -730,7 +922,15 @@ class TomatoCatAgent:
             "tool_calls": all_tool_calls,
         }
 
-    async def _post_conversation_memory(self, user_text: str, assistant_text: str) -> None:
+    async def _post_conversation_memory(
+        self,
+        user_text: str,
+        assistant_text: str,
+        *,
+        session_key: str = "",
+        channel: str = "",
+        chat_id: str = "",
+    ) -> None:
         if not self.memory:
             return
 
@@ -739,6 +939,11 @@ class TomatoCatAgent:
                 user_text=user_text,
                 assistant_text=assistant_text,
                 llm_call=self._fast_llm.simple_chat,
+                scope=MemoryScope(
+                    session_key=session_key,
+                    channel=channel,
+                    chat_id=chat_id,
+                ),
             )
 
             if self.memory.tick_conversation():

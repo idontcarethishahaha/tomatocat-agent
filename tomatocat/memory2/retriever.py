@@ -6,8 +6,6 @@ import asyncio
 import logging
 import re
 from collections import defaultdict
-from typing import cast
-
 from tomatocat.memory2.store import MemoryItem, MemoryHit, VectorMemoryStore
 from tomatocat.memory2.embedder import Embedder
 
@@ -40,10 +38,11 @@ class Retriever:
         *,
         intent: str = "answer",
         limit: int = 8,
+        session_key: str = "",
     ) -> list[MemoryHit]:
         tasks = [
-            self._semantic_search(text),
-            self._keyword_search(text),
+            self._semantic_search(text, session_key=session_key),
+            self._keyword_search(text, session_key=session_key),
         ]
         semantic_hits, keyword_hits = await asyncio.gather(*tasks)
 
@@ -52,13 +51,18 @@ class Retriever:
 
         return filtered[:limit]
 
-    async def _semantic_search(self, text: str) -> list[MemoryHit]:
+    async def _semantic_search(self, text: str, *, session_key: str) -> list[MemoryHit]:
         try:
             query_embedding = await asyncio.wait_for(
                 self._embedder.embed(text),
                 timeout=_EMBED_TIMEOUT_S,
             )
-            return self._store.search_by_embedding(query_embedding, top_k=self._top_k)
+            return await asyncio.to_thread(
+                self._store.search_by_embedding,
+                query_embedding,
+                top_k=self._top_k,
+                session_key=session_key,
+            )
         except asyncio.TimeoutError:
             logger.warning("[retriever] embedding 超时")
             return []
@@ -66,12 +70,17 @@ class Retriever:
             logger.error("[retriever] 语义检索失败: %s", e)
             return []
 
-    async def _keyword_search(self, text: str) -> list[MemoryHit]:
+    async def _keyword_search(self, text: str, *, session_key: str) -> list[MemoryHit]:
         try:
             tokens = _extract_keywords(text)
             if not tokens:
                 return []
-            return self._store.search_by_keywords(tokens, top_k=self._top_k)
+            return await asyncio.to_thread(
+                self._store.search_by_keywords,
+                tokens,
+                top_k=self._top_k,
+                session_key=session_key,
+            )
         except Exception as e:
             logger.error("[retriever] 关键词检索失败: %s", e)
             return []
@@ -82,29 +91,37 @@ class Retriever:
         keyword_hits: list[MemoryHit],
     ) -> list[MemoryHit]:
         score_map: dict[str, float] = {}
+        relevance_map: dict[str, float] = {}
         item_map: dict[str, MemoryItem] = {}
         match_type_map: dict[str, str] = {}
+        active_weight = (0.7 if semantic_hits else 0.0) + (0.3 if keyword_hits else 0.0)
+        if active_weight == 0:
+            return []
 
         for rank, hit in enumerate(semantic_hits, start=1):
             score = 1.0 / (_RRF_K + rank)
             score_map[hit.item.id] = score_map.get(hit.item.id, 0.0) + score * 0.7
+            relevance_map[hit.item.id] = relevance_map.get(hit.item.id, 0.0) + hit.score * 0.7
             item_map[hit.item.id] = hit.item
-            if hit.match_type == "semantic":
-                match_type_map[hit.item.id] = "hybrid"
+            match_type_map[hit.item.id] = "semantic"
 
         for rank, hit in enumerate(keyword_hits, start=1):
             score = 1.0 / (_RRF_K + rank)
             score_map[hit.item.id] = score_map.get(hit.item.id, 0.0) + score * 0.3
+            relevance_map[hit.item.id] = relevance_map.get(hit.item.id, 0.0) + hit.score * 0.3
             item_map[hit.item.id] = hit.item
-            if hit.item.id not in match_type_map:
-                match_type_map[hit.item.id] = hit.match_type
+            match_type_map[hit.item.id] = (
+                "hybrid" if hit.item.id in match_type_map else "keyword"
+            )
 
         results = []
+        normalization = (_RRF_K + 1) / active_weight
         for item_id, score in score_map.items():
+            relevance = relevance_map[item_id] / active_weight
             results.append(MemoryHit(
                 item=item_map[item_id],
-                score=score,
-                match_type=match_type_map.get(item_id, "hybrid"),
+                score=min(score * normalization * relevance, 1.0),
+                match_type=match_type_map[item_id],
             ))
 
         results.sort(key=lambda x: x.score, reverse=True)

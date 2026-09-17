@@ -101,10 +101,12 @@ class Memory2Plugin(Plugin):
         """从配置文件读取 memory2 配置"""
         try:
             import tomllib
-            # 尝试从工作区根目录找 config.toml
-            config_path = Path("D:/ai学习项目/akashic-agent-study/tomatocat-agent-v2/config.toml")
+            config_path = self.context.shared.get("config_path")
+            if config_path is None:
+                config_path = Path.cwd() / "config.toml"
+            config_path = Path(config_path)
             if config_path.exists():
-                with open(config_path, "rb") as f:
+                with config_path.open("rb") as f:
                     cfg = tomllib.load(f)
                 return cfg.get("memory2", {})
         except Exception as e:
@@ -301,8 +303,9 @@ class Memory2Plugin(Plugin):
         if not self._enabled or not self._store:
             return "向量记忆未启用"
 
-        self._store.delete(item_id)
-        return f"✅ 记忆 {item_id} 已删除"
+        if self._store.delete(item_id):
+            return f"✅ 记忆 {item_id} 已删除"
+        return f"未找到记忆 {item_id}"
 
     # ── 对外 API（供其他模块调用） ─────────────────────────────
 

@@ -6,7 +6,7 @@ from pathlib import Path
 
 from PyQt6.QtWidgets import QWidget, QApplication, QLabel
 from PyQt6.QtCore import Qt, QTimer, QPoint, QSize, pyqtSignal
-from PyQt6.QtGui import (QPainter, QColor, QMovie,
+from PyQt6.QtGui import (QPainter, QColor, QMovie, QKeySequence, QShortcut,
                           QDragEnterEvent, QDropEvent, QMouseEvent)
 
 from sprites import SPRITE_SIZE, SCALE, PALETTE, ANIMATIONS
@@ -79,6 +79,13 @@ class PetWindow(QWidget):
 
         # 文件分析完成信号 → 主线程更新 UI
         self._analysis_done.connect(self._on_analysis_done)
+
+        # Chat is intentionally not bound to a click on the pet, which avoids
+        # accidental popups while dragging or interacting with the desktop.
+        # Ctrl+Shift+M remains a quick, deliberate keyboard entry point.
+        self._chat_shortcut = QShortcut(QKeySequence("Ctrl+Shift+M"), self)
+        self._chat_shortcut.setContext(Qt.ShortcutContext.ApplicationShortcut)
+        self._chat_shortcut.activated.connect(self._toggle_chat)
 
     def _setup_window(self):
         self.setWindowFlags(
@@ -264,12 +271,12 @@ class PetWindow(QWidget):
             self._dragging = False
             if was_drag:
                 delta = self._event_global_pos(event) - (self.pos() + self._drag_offset)
-                if delta.manhattanLength() < 12:
-                    self._open_chat()
                 self.sys._save_state()
 
     def mouseDoubleClickEvent(self, event: QMouseEvent):
-        self._open_chat()
+        # Double-click is deliberately kept inert; use the context menu or
+        # Ctrl+Shift+M to open chat.
+        event.accept()
 
     def enterEvent(self, event):
         self.sys.boost_mood(2)
@@ -344,6 +351,13 @@ class PetWindow(QWidget):
         self._chat.position_near(self.geometry())
         self._chat.raise_()
         self._chat.input_box.setFocus()
+
+    def _toggle_chat(self):
+        """Open chat when hidden, or explicitly close it via the shortcut."""
+        if self._chat is not None and self._chat.isVisible():
+            self._chat._dismiss()
+            return
+        self._open_chat()
 
     def _on_chat_closed(self):
         self._chat = None

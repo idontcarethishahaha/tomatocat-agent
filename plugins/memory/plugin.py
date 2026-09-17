@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from tomatocat.plugins import Plugin, tool
+from tomatocat.core.memory.engine import MemoryMutation, MemoryQuery, MemoryScope
 
 
 class MemoryPlugin(Plugin):
@@ -23,6 +24,8 @@ class MemoryPlugin(Plugin):
         event: object,
         content: str,
         category: str = "general",
+        _session_key: str = "",
+        _channel: str = "",
     ) -> str:
         """
         记住一条信息
@@ -36,7 +39,15 @@ class MemoryPlugin(Plugin):
             return "记忆系统未就绪"
 
         try:
-            item_id = await memory.add_memory(content, category)
+            result = await memory.mutate(MemoryMutation(
+                kind="remember",
+                scope=_memory_scope(_session_key, _channel),
+                summary=content,
+                memory_kind=category,
+                source_ref="memory_tool",
+            ))
+            if not result.accepted:
+                return "记忆失败: 记忆引擎拒绝了写入"
             return f"已记住喵~ [{category}] {content[:50]}"
         except Exception as e:
             return f"记忆失败: {e}"
@@ -47,6 +58,8 @@ class MemoryPlugin(Plugin):
         event: object,
         query: str,
         top_k: int = 5,
+        _session_key: str = "",
+        _channel: str = "",
     ) -> str:
         """
         搜索记忆
@@ -60,14 +73,18 @@ class MemoryPlugin(Plugin):
             return "记忆系统未就绪"
 
         try:
-            results = await memory.search(query, top_k=top_k)
-            if not results:
+            result = await memory.query(MemoryQuery(
+                text=query,
+                intent="answer",
+                limit=top_k,
+                scope=_memory_scope(_session_key, _channel),
+            ))
+            if not result.records:
                 return f"没有找到和 '{query}' 相关的记忆"
 
-            lines = [f"找到 {len(results)} 条相关记忆："]
-            for i, r in enumerate(results, 1):
-                sim = r.get("similarity", 0)
-                lines.append(f"{i}. [{r['category']}] {r['content'][:80]} (相似度: {sim:.2f})")
+            lines = [f"找到 {len(result.records)} 条相关记忆："]
+            for i, record in enumerate(result.records, 1):
+                lines.append(f"{i}. [{record.kind}] {record.summary[:80]} (相似度: {record.score:.2f})")
             return "\n".join(lines)
         except Exception as e:
             return f"搜索失败: {e}"
@@ -77,6 +94,8 @@ class MemoryPlugin(Plugin):
         self,
         event: object,
         memory_id: str,
+        _session_key: str = "",
+        _channel: str = "",
     ) -> str:
         """
         删除指定 ID 的记忆
@@ -88,8 +107,12 @@ class MemoryPlugin(Plugin):
         if not memory:
             return "记忆系统未就绪"
 
-        ok = memory.remove_memory(memory_id)
-        if ok:
+        result = await memory.mutate(MemoryMutation(
+            kind="forget",
+            ids=(memory_id,),
+            scope=_memory_scope(_session_key, _channel),
+        ))
+        if result.accepted and memory_id in result.affected_ids:
             return f"已遗忘记忆 {memory_id[:12]}..."
         return f"没有找到ID为 {memory_id[:12]}... 的记忆"
 
@@ -100,8 +123,8 @@ class MemoryPlugin(Plugin):
         if not memory:
             return "记忆系统未就绪"
 
-        recent = memory.get_recent(limit=5)
-        memory_md = memory.get_memory_md()
+        recent, _ = memory.list_items_for_dashboard(page=1, page_size=5)
+        memory_md = memory.get_context_block()
 
         lines = ["📝 记忆概览："]
         lines.append(f"\n长期记忆 (MEMORY.md):\n{memory_md[:300]}")
@@ -109,8 +132,13 @@ class MemoryPlugin(Plugin):
         if recent:
             lines.append(f"\n最近 {len(recent)} 条向量记忆：")
             for r in recent:
-                lines.append(f"  - [{r['category']}] {r['content'][:50]}")
+                lines.append(f"  - [{r['memory_type']}] {r['summary'][:50]}")
         else:
             lines.append("\n暂无向量记忆")
 
         return "\n".join(lines)
+
+
+def _memory_scope(session_key: str, channel: str) -> MemoryScope:
+    chat_id = session_key.split(":", 1)[1] if ":" in session_key else session_key
+    return MemoryScope(session_key=session_key, channel=channel, chat_id=chat_id)

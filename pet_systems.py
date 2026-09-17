@@ -81,7 +81,8 @@ class PetSystems:
         self._tomato_timer = None
 
         # Mood
-        self._mood = self._cfg.get("mood", 70)
+        self._mood = self._safe_percentage(self._cfg.get("mood", 70), 70)
+        self._bond = self._safe_percentage(self._cfg.get("bond", 0), 0)
         self._last_save_time = 0
 
         # Idle sleep
@@ -240,6 +241,8 @@ class PetSystems:
         mood_label = "😊" if self._mood >= 70 else ("😐" if self._mood >= 40 else "😿")
         self._mood_action = self._menu.addAction(f"心情 {mood_label} {self._mood}%")
         self._mood_action.setEnabled(False)
+        self._bond_action = self._menu.addAction(f"亲密度 {self._bond}%")
+        self._bond_action.setEnabled(False)
 
         # -- About & Quit --
         self._menu.addSeparator()
@@ -353,6 +356,28 @@ class PetSystems:
         self._refresh_mood_display()
         self._save_state_debounced()
 
+    @property
+    def bond(self):
+        return self._bond
+
+    @staticmethod
+    def _safe_percentage(value, default=0):
+        try:
+            return max(0, min(100, int(value)))
+        except (TypeError, ValueError):
+            return default
+
+    def boost_bond(self, amount=1):
+        try:
+            increment = max(0, int(amount))
+        except (TypeError, ValueError):
+            increment = 0
+        self._bond = min(100, self._bond + increment)
+        if hasattr(self, "_bond_action"):
+            self._bond_action.setText(f"亲密度 {self._bond}%")
+        # Bond changes are infrequent and meaningful, so persist immediately.
+        self._save_state()
+
     def _decay_mood(self):
         if not self._is_sleeping:
             self._mood = max(0, self._mood - 1)
@@ -371,6 +396,7 @@ class PetSystems:
     def _save_state(self):
         self._cfg["window_pos"] = [self.pet.x(), self.pet.y()]
         self._cfg["mood"] = self._mood
+        self._cfg["bond"] = self._bond
         save_config(self._cfg)
 
     def restore_position(self):
