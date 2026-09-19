@@ -154,6 +154,32 @@ def test_telegram_delivery_exception_is_propagated():
         asyncio.run(channel.send_message("123", "hello"))
 
 
+def test_telegram_stale_pending_updates_restart_polling(monkeypatch):
+    class Bot:
+        async def get_webhook_info(self):
+            return SimpleNamespace(pending_update_count=2)
+
+    async def scenario():
+        channel = TelegramChannel("token")
+        channel._application = SimpleNamespace(bot=Bot(), updater=SimpleNamespace())
+        channel._polling = True
+        restarted = []
+
+        async def restart():
+            restarted.append(True)
+            channel._polling = False
+
+        async def no_wait(_seconds):
+            return None
+
+        channel._restart_polling = restart
+        monkeypatch.setattr(asyncio, "sleep", no_wait)
+        await channel._watch_polling()
+        assert restarted == [True]
+
+    asyncio.run(scenario())
+
+
 def test_memory_ingest_returns_string_id():
     class Embedder:
         async def embed(self, _content):

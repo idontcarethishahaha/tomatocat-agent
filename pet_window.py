@@ -287,9 +287,13 @@ class PetWindow(QWidget):
         self.sys.menu.popup(self._event_global_pos(event))
 
     def _clamp(self, x, y):
-        screen = QApplication.primaryScreen().availableGeometry()
-        x = max(screen.left(), min(x, screen.right() - self.width()))
-        y = max(screen.top(), min(y, screen.bottom() - self.height()))
+        center = QPoint(x + self.width() // 2, y + self.height() // 2)
+        target_screen = QApplication.screenAt(center) or QApplication.primaryScreen()
+        screen = target_screen.availableGeometry()
+        max_x = screen.left() + max(0, screen.width() - self.width())
+        max_y = screen.top() + max(0, screen.height() - self.height())
+        x = max(screen.left(), min(x, max_x))
+        y = max(screen.top(), min(y, max_y))
         return x, y
 
     def dragEnterEvent(self, event: QDragEnterEvent):

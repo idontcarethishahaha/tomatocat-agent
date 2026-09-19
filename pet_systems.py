@@ -158,6 +158,7 @@ class PetSystems:
         m = QMenu()
         m.addAction("显示/隐藏").triggered.connect(self._toggle_visible)
         m.addAction("聊天").triggered.connect(self.pet._open_chat)
+        m.addAction("重置位置").triggered.connect(self.reset_position)
         m.addSeparator()
         m.addAction("退出").triggered.connect(self.pet._quit_app)
         self._tray.setContextMenu(m)
@@ -230,6 +231,8 @@ class PetSystems:
         self._clipboard_action.setCheckable(True)
         self._clipboard_action.setChecked(True)
         self._clipboard_action.triggered.connect(self._toggle_clipboard)
+
+        settings.addAction("重置位置").triggered.connect(self.reset_position)
 
         self._auto_chat_action = settings.addAction("💭 主动搭话")
         self._auto_chat_action.setCheckable(True)
@@ -402,11 +405,25 @@ class PetSystems:
     def restore_position(self):
         pos = self._cfg.get("window_pos")
         if pos and len(pos) == 2:
-            x, y = pos
-            from PyQt6.QtWidgets import QApplication
-            screen = QApplication.primaryScreen().availableGeometry()
-            if screen.contains(x, y):
-                self.pet.move(x, y)
+            try:
+                x, y = self.pet._clamp(int(pos[0]), int(pos[1]))
+            except (TypeError, ValueError):
+                self.reset_position()
+                return
+            self.pet.move(x, y)
+
+    def reset_position(self):
+        """Move the complete pet window back onto the primary screen."""
+        from PyQt6.QtWidgets import QApplication
+
+        screen = QApplication.primaryScreen().availableGeometry()
+        x = screen.right() - self.pet.width() - 40
+        y = screen.bottom() - self.pet.height() - 100
+        x, y = self.pet._clamp(x, y)
+        self.pet.move(x, y)
+        self.pet.show()
+        self.pet.raise_()
+        self._save_state()
 
     # ─── proactive behavior ─────────────────────────────
 
@@ -454,7 +471,8 @@ class PetSystems:
             nonlocal steps
             if steps <= 0:
                 return
-            self.pet.move(self.pet.x() + d * 4, self.pet.y())
+            x, y = self.pet._clamp(self.pet.x() + d * 4, self.pet.y())
+            self.pet.move(x, y)
             self.pet._facing_right = (d > 0)
             steps -= 1
             if steps > 0:
