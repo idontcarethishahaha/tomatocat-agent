@@ -155,27 +155,27 @@ def test_telegram_delivery_exception_is_propagated():
 
 
 def test_telegram_stale_pending_updates_restart_polling(monkeypatch):
-    class Bot:
-        async def get_webhook_info(self):
-            return SimpleNamespace(pending_update_count=2)
-
     async def scenario():
         channel = TelegramChannel("token")
-        channel._application = SimpleNamespace(bot=Bot(), updater=SimpleNamespace())
+        channel._application = SimpleNamespace(updater=SimpleNamespace())
         channel._polling = True
         restarted = []
 
-        async def restart():
-            restarted.append(True)
+        async def probe():
+            return 2
+
+        async def restart(reason):
+            restarted.append(reason)
             channel._polling = False
 
         async def no_wait(_seconds):
             return None
 
+        channel._probe_pending_updates = probe
         channel._restart_polling = restart
         monkeypatch.setattr(asyncio, "sleep", no_wait)
         await channel._watch_polling()
-        assert restarted == [True]
+        assert restarted == ["2 条更新持续积压"]
 
     asyncio.run(scenario())
 

@@ -65,7 +65,7 @@ class WebSearchPlugin(Plugin):
         }
 
         try:
-            async with httpx.AsyncClient(timeout=25.0) as client:
+            async with httpx.AsyncClient(timeout=25.0, trust_env=False) as client:
                 response = await client.post(
                     _MCP_URL,
                     json=payload,

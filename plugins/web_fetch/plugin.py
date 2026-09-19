@@ -85,7 +85,11 @@ class WebFetchPlugin(Plugin):
         timeout = min(max(1, int(timeout)), _MAX_TIMEOUT)
 
         try:
-            async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+            async with httpx.AsyncClient(
+                timeout=timeout,
+                follow_redirects=True,
+                trust_env=False,
+            ) as client:
                 resp = await client.get(
                     url,
                     headers={

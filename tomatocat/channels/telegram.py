@@ -10,8 +10,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+import httpx
 from telegram import MessageEntity, Update
 from telegram.error import TimedOut, NetworkError, RetryAfter, RetryAfter as _RetryAfter
+from telegram.request import HTTPXRequest
 from telegram.ext import (
     ApplicationBuilder,
     ContextTypes,
@@ -29,6 +31,9 @@ _SEND_RETRIES = 2
 _SEND_RETRY_DELAY = 3
 _POLL_HEALTH_INTERVAL_S = 30
 _POLL_STALE_CHECKS = 2
+_POLL_TIMEOUT_S = 5
+_POLL_RESTART_COOLDOWN_S = 60
+_START_RETRIES = 4
 
 _LIVE_MIN_INTERVAL_S = 1.5
 _LIVE_MIN_CHARS = 60
@@ -100,6 +105,9 @@ class TelegramChannel(Channel):
         self._poll_watchdog_task: asyncio.Task | None = None
         self._last_pending_updates = 0
         self._stale_pending_checks = 0
+        self._poll_restart_lock = asyncio.Lock()
+        self._next_poll_restart_at = 0.0
+        self._health_check_failures = 0
         self._live: dict[str, _LiveState] = {}
         self._upload_dir = upload_dir or Path(".")
 
@@ -110,22 +118,26 @@ class TelegramChannel(Channel):
 
         self._upload_dir.mkdir(parents=True, exist_ok=True)
 
-        self._application = (
-            ApplicationBuilder()
-            .token(self.token)
-            .build()
-        )
+        self._application = self._build_application()
 
         self._application.add_handler(CommandHandler("start", self._start_cmd))
         self._application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self._on_message))
         self._application.add_handler(MessageHandler(filters.PHOTO, self._on_photo))
         self._application.add_error_handler(self._on_application_error)
 
-        await self._application.initialize()
-        # Match Application.run_polling() lifecycle order: start fetching
-        # updates before starting the queue consumer.
-        await self._application.updater.start_polling(bootstrap_retries=3)
-        await self._application.start()
+        try:
+            await self._initialize_with_retries()
+            # Match Application.run_polling() lifecycle order: start fetching
+            # updates before starting the queue consumer.
+            await self._application.updater.start_polling(
+                timeout=_POLL_TIMEOUT_S,
+                bootstrap_retries=3,
+                error_callback=self._on_polling_error,
+            )
+            await self._application.start()
+        except Exception:
+            await self._cleanup_application()
+            raise
         self._polling = True
         self._poll_watchdog_task = asyncio.create_task(
             self._watch_polling(),
@@ -134,19 +146,73 @@ class TelegramChannel(Channel):
         logger.info("[telegram] Telegram 渠道已启动")
         print("渠道已启动: telegram")
 
+    def _build_application(self):
+        # TUN mode already routes direct sockets. Ignoring HTTP(S)_PROXY avoids
+        # sending Telegram long polls through a second localhost proxy layer.
+        request = HTTPXRequest(
+            connection_pool_size=16,
+            connect_timeout=15,
+            read_timeout=30,
+            pool_timeout=15,
+            httpx_kwargs={"trust_env": False},
+        )
+        get_updates_request = HTTPXRequest(
+            connection_pool_size=2,
+            connect_timeout=15,
+            read_timeout=15,
+            pool_timeout=15,
+            httpx_kwargs={"trust_env": False},
+        )
+        return (
+            ApplicationBuilder()
+            .token(self.token)
+            .request(request)
+            .get_updates_request(get_updates_request)
+            .build()
+        )
+
     async def stop(self) -> None:
         if self._application:
+            self._polling = False
             if self._poll_watchdog_task:
                 self._poll_watchdog_task.cancel()
                 with contextlib.suppress(asyncio.CancelledError):
                     await self._poll_watchdog_task
                 self._poll_watchdog_task = None
-            if self._polling:
-                await self._application.updater.stop()
-            await self._application.stop()
-            await self._application.shutdown()
-            self._application = None
-            self._polling = False
+            await self._cleanup_application()
+
+    async def _initialize_with_retries(self) -> None:
+        for attempt in range(1, _START_RETRIES + 1):
+            try:
+                await self._application.initialize()
+                return
+            except (NetworkError, TimedOut) as exc:
+                if attempt >= _START_RETRIES:
+                    raise
+                delay = min(2 ** (attempt - 1), 8)
+                logger.warning(
+                    "[telegram] 初始化网络暂时失败 (%s)，%d 秒后重试 (%d/%d)",
+                    type(exc).__name__,
+                    delay,
+                    attempt,
+                    _START_RETRIES,
+                )
+                await asyncio.sleep(delay)
+
+    async def _cleanup_application(self) -> None:
+        application = self._application
+        if not application:
+            return
+        with contextlib.suppress(Exception):
+            if application.updater.running:
+                await application.updater.stop()
+        with contextlib.suppress(Exception):
+            if application.running:
+                await application.stop()
+        with contextlib.suppress(Exception):
+            await application.shutdown()
+        self._application = None
+        self._polling = False
 
     async def _on_application_error(self, update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
         logger.error(
@@ -157,6 +223,12 @@ class TelegramChannel(Channel):
                 context.error,
                 context.error.__traceback__,
             ) if context.error else None,
+        )
+
+    def _on_polling_error(self, error: Exception) -> None:
+        logger.warning(
+            "[telegram] 轮询网络暂时失败 (%s)，内置重试将继续",
+            type(error).__name__,
         )
 
     async def _watch_polling(self) -> None:
@@ -173,11 +245,11 @@ class TelegramChannel(Channel):
                     if not polling_task.cancelled():
                         error = polling_task.exception()
                     logger.error("[telegram] 轮询任务意外停止: %s，正在恢复", error or "无异常信息")
-                    await self._restart_polling()
+                    await self._restart_polling("轮询任务已停止")
                     continue
 
-                webhook = await self._application.bot.get_webhook_info()
-                pending = int(getattr(webhook, "pending_update_count", 0) or 0)
+                pending = await self._probe_pending_updates()
+                self._health_check_failures = 0
                 if pending > 0 and pending == self._last_pending_updates:
                     self._stale_pending_checks += 1
                 elif pending > 0:
@@ -191,20 +263,57 @@ class TelegramChannel(Channel):
                         "[telegram] 检测到 %d 条更新持续积压，正在重启轮询",
                         pending,
                     )
-                    await self._restart_polling()
+                    await self._restart_polling(f"{pending} 条更新持续积压")
             except asyncio.CancelledError:
                 raise
-            except Exception:
-                logger.exception("[telegram] 轮询健康检查失败")
+            except Exception as exc:
+                self._health_check_failures += 1
+                if self._health_check_failures == 1 or self._health_check_failures % 5 == 0:
+                    logger.warning(
+                        "[telegram] 轮询健康检查暂时失败 (%s)，将在下个周期重试",
+                        type(exc).__name__,
+                    )
 
-    async def _restart_polling(self) -> None:
-        updater = self._application.updater
-        if updater.running:
-            await updater.stop()
-        await updater.start_polling(bootstrap_retries=3)
-        self._last_pending_updates = 0
-        self._stale_pending_checks = 0
-        logger.info("[telegram] 轮询已恢复")
+    async def _probe_pending_updates(self) -> int:
+        """Check backlog through an isolated short-lived HTTP connection."""
+        url = f"https://api.telegram.org/bot{self.token}/getWebhookInfo"
+        timeout = httpx.Timeout(10)
+        limits = httpx.Limits(max_connections=2, max_keepalive_connections=0)
+        async with httpx.AsyncClient(
+            timeout=timeout,
+            limits=limits,
+            trust_env=False,
+        ) as client:
+            response = await client.get(url)
+            response.raise_for_status()
+            payload = response.json()
+        if not payload.get("ok"):
+            raise RuntimeError("Telegram health endpoint returned an error")
+        return int(payload.get("result", {}).get("pending_update_count", 0) or 0)
+
+    async def _restart_polling(self, reason: str) -> None:
+        async with self._poll_restart_lock:
+            if not self._application or not self._polling:
+                return
+            loop = asyncio.get_running_loop()
+            now = loop.time()
+            if now < self._next_poll_restart_at:
+                logger.info("[telegram] 轮询恢复仍在冷却期，跳过重复操作")
+                return
+            self._next_poll_restart_at = now + _POLL_RESTART_COOLDOWN_S
+
+            updater = self._application.updater
+            logger.warning("[telegram] 正在恢复轮询: %s", reason)
+            if updater.running:
+                await asyncio.wait_for(updater.stop(), timeout=30)
+            await updater.start_polling(
+                timeout=_POLL_TIMEOUT_S,
+                bootstrap_retries=3,
+                error_callback=self._on_polling_error,
+            )
+            self._last_pending_updates = 0
+            self._stale_pending_checks = 0
+            logger.info("[telegram] 轮询已重新启动")
 
     async def start_sender(self) -> None:
         """Initialize outbound Telegram access without starting polling."""
@@ -212,9 +321,13 @@ class TelegramChannel(Channel):
             return
         if not self.token:
             raise RuntimeError("telegram token is not configured")
-        self._application = ApplicationBuilder().token(self.token).build()
-        await self._application.initialize()
-        await self._application.start()
+        self._application = self._build_application()
+        try:
+            await self._initialize_with_retries()
+            await self._application.start()
+        except Exception:
+            await self._cleanup_application()
+            raise
 
     async def send_message(self, chat_id: str, text: str) -> None:
         """发送主动消息，带超时和重试"""

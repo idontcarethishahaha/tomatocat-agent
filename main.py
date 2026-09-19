@@ -79,6 +79,15 @@ async def serve(
     maintenance_channel: str = "",
 ) -> dict:
     from tomatocat.config import Config
+    from tomatocat.network import configure_tun_routing
+
+    removed_proxy_vars = configure_tun_routing()
+    if removed_proxy_vars:
+        logger.info(
+            "TUN 网络模式已启用，忽略环境代理变量: %s",
+            ", ".join(removed_proxy_vars),
+        )
+
     from tomatocat.bus import EventBus
     from tomatocat.session import SessionManager
     from tomatocat.plugins.manager import PluginManager

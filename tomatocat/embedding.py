@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from typing import List
 
+import httpx
 import numpy as np
 from openai import AsyncOpenAI
 
@@ -12,7 +13,11 @@ log = logging.getLogger(__name__)
 class EmbeddingService:
     def __init__(self, api_key: str, base_url: str, model: str):
         self.model = model
-        self._client = AsyncOpenAI(api_key=api_key, base_url=base_url)
+        self._client = AsyncOpenAI(
+            api_key=api_key,
+            base_url=base_url,
+            http_client=httpx.AsyncClient(trust_env=False),
+        )
         self._cache: dict[str, np.ndarray] = {}
 
     async def embed(self, text: str) -> np.ndarray:

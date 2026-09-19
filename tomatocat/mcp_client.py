@@ -28,6 +28,7 @@ class MCPServerConnection:
         self._pending: dict[int, asyncio.Future] = {}
         self._read_task: asyncio.Task | None = None
         self._stderr_task: asyncio.Task | None = None
+        self._stderr_log_level = logging.INFO
         self._lock = asyncio.Lock()
         self._initialized = False
 
@@ -95,7 +96,14 @@ class MCPServerConnection:
                     break
                 text = line.decode("utf-8", errors="replace").rstrip()
                 if text:
-                    log.warning("[mcp:%s] %s", self.name, text)
+                    upper = text.upper()
+                    if "CRITICAL" in upper or "ERROR" in upper or text.startswith("Traceback"):
+                        self._stderr_log_level = logging.ERROR
+                    elif "WARNING" in upper or " WARN " in upper:
+                        self._stderr_log_level = logging.WARNING
+                    elif " INFO " in upper or " DEBUG " in upper:
+                        self._stderr_log_level = logging.INFO
+                    log.log(self._stderr_log_level, "[mcp:%s] %s", self.name, text)
         except asyncio.CancelledError:
             pass
         except Exception as exc:

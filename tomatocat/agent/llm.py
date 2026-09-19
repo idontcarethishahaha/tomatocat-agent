@@ -5,11 +5,11 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import os
 import re
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable
 
+import httpx
 from openai import AsyncOpenAI
 
 logger = logging.getLogger(__name__)
@@ -28,14 +28,6 @@ def _should_bypass_proxy(base_url: str) -> bool:
         return any(h in host for h in _DOMESTIC_API_HOSTS)
     except Exception:
         return False
-
-
-def _clean_proxy_env() -> None:
-    """如果环境变量中设了代理，清除掉以免影响国内 API 连接"""
-    for key in ("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"):
-        val = os.environ.get(key, "")
-        if val:
-            logger.info("[llm] 检测到代理环境变量 %s=%s，将使用 httpx 直连国内 API", key, val)
 
 _StreamDelta = dict[str, str]
 
@@ -80,13 +72,11 @@ class LLMProvider:
         if base_url:
             client_kwargs["base_url"] = base_url
 
-        # 国内 API 直连，绕过代理
+        client_kwargs["http_client"] = httpx.AsyncClient(
+            timeout=httpx.Timeout(120.0, connect=30.0),
+            trust_env=False,
+        )
         if _should_bypass_proxy(base_url):
-            import httpx
-            client_kwargs["http_client"] = httpx.AsyncClient(
-                proxy=None,
-                timeout=httpx.Timeout(120.0, connect=30.0),
-            )
             logger.info("[llm] %s 为国内 API，已绕过代理直连", base_url)
 
         self._client = AsyncOpenAI(**client_kwargs)

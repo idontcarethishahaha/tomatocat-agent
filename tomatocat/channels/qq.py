@@ -431,7 +431,11 @@ class QQChannel(Channel):
             "image/gif": ".gif",
             "image/webp": ".webp",
         }
-        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
+        async with httpx.AsyncClient(
+            timeout=30,
+            follow_redirects=True,
+            trust_env=False,
+        ) as client:
             for i, url in enumerate(urls):
                 try:
                     resp = await client.get(url)

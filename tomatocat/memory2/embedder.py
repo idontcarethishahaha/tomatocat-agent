@@ -29,7 +29,7 @@ class Embedder:
         self._key = api_key
         self._model = model
         self._output_dimensionality = output_dimensionality
-        self._client = httpx.AsyncClient(timeout=30.0)
+        self._client = httpx.AsyncClient(timeout=30.0, trust_env=False)
 
     async def embed(self, text: str) -> list[float]:
         """单条 embed"""
